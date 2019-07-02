@@ -1,0 +1,180 @@
+---
+title: "Get study effort"
+author: "Dan Benesh"
+date: "7/2/2019"
+output: html_document
+---
+
+I want to study host specificity in complex life cycle parasites. A key confounder of host specificity is study effort. Here I produce several metrics for study effort on every parasite species in the life cycle database.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(rentrez)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r importdata}
+dat_host <- read.csv(file = "../data/CLC_database_hosts.csv", header = TRUE)
+dat_lh <- read.csv(file = "../data/CLC_database_lifehistory.csv", header = TRUE)
+```
+
+# Number of unique publications in life cycle database
+
+```{r}
+dat_host <- mutate(dat_host, publication = paste(Author, Year, Journal, Volume, Pages)) # creat publication variable
+dat_lh <- mutate(dat_lh, publication = paste(Author, Year, Journal, Volume, Pages))
+```
+```{r}
+dat_hosts_pub <- filter(dat_host, !is.na(Author), !is.na(Year), !is.na(Journal))%>%
+  select(Parasite.species, publication)%>%
+  distinct()
+dat_lh_pub <- filter(dat_lh, !is.na(Author), !is.na(Year), !is.na(Journal))%>%
+  select(Parasite.species, publication)%>%
+  distinct()
+study_effort <- bind_rows(dat_hosts_pub, dat_lh_pub)%>%arrange(Parasite.species, publication)%>%distinct()
+```
+```{r}
+study_effort <- group_by(study_effort, Parasite.species)%>%
+  summarise(n_lcdb = n())
+```
+
+```{r}
+study_effort
+```
+
+
+# Get pubmed hits
+
+
+```{r}
+entrez_dbs()
+```
+
+```{r}
+# entrez_db_searchable("pubmed")
+```
+
+```{r}
+# make queries for pubmed from species names
+query_sp_name <- unique(dat_host$Parasite.species)
+query_sp_name <- gsub(query_sp_name, pattern = " ", replacement = "+")
+
+# make additional query, species name plus parasite group
+query_sp_name_group <- select(dat_host, Parasite.species, Parasite.group)%>%distinct()
+query_sp_name_group <- mutate(query_sp_name_group,
+                              Parasite.species = gsub(Parasite.species, pattern = " ", replacement = "+"),
+                              p_g_wc = if_else(Parasite.group == 'nematode', 'nematod*', 
+                                               if_else(Parasite.group == 'cestode', 'cestod*', 'acanthocephala*')))
+query_sp_name_group <- paste0(query_sp_name_group$Parasite.species, '[ALL] AND ', query_sp_name_group$p_g_wc, '[ALL]')
+```
+
+
+```{r}
+for(query in query_sp_name){
+  # search
+  search_res <- entrez_search(db = "pubmed", term = query)
+  # report hits
+  num_hits <- search_res$count
+  print(paste(num_hits, "hits for", query))
+  
+  if(query == query_sp_name[1]){
+    pubmed_hits1 <- num_hits
+  } else {
+    pubmed_hits1 <- c(pubmed_hits1, num_hits)
+  }
+}
+
+```
+
+
+```{r}
+for(query in query_sp_name_group){
+  # search
+  search_res <- entrez_search(db = "pubmed", term = query)
+  # report hits
+  num_hits <- search_res$count
+  print(paste(num_hits, "hits for", query))
+  
+  if(query == query_sp_name_group[1]){
+    pubmed_hits2 <- num_hits
+  } else {
+    pubmed_hits2 <- c(pubmed_hits2, num_hits)
+  }
+}
+
+```
+
+```{r}
+study_effort$n_pubmed_spname <- pubmed_hits1
+study_effort$n_pubmed_spname_group <- pubmed_hits2
+```
+
+Here is the distribution of pubmed hits based on just species names.
+
+```{r}
+ggplot(study_effort, aes(x = n_lcdb)) + geom_histogram()
+ggplot(study_effort, aes(x = n_pubmed_spname)) + geom_histogram()
+```
+
+The distribution based on species name and parasite taxa looks similar.
+
+```{r}
+ggplot(study_effort, aes(x = n_pubmed_spname_group)) + geom_histogram()
+```
+
+Since it looks quite skewed, let's look at correlations on log scales. Here is the correlation between pubmed hits with and without a group term in the query. The correlation is quite good. At high values, the query including the group name returns fewer results (the black line is the 1:1 line).
+
+```{r}
+ggplot(study_effort, aes(y = n_pubmed_spname_group, x = n_pubmed_spname)) + 
+  geom_point(alpha = 0.2) + 
+  geom_smooth() +
+  geom_abline(slope = 1, intercept = 0) +
+  scale_y_log10() + scale_x_log10()
+```
+
+The species with largest difference between the two pubmed queries are all very well studied helminths. In many publications, authors probably do not bother to mention their taxonomic group.
+
+```{r}
+head( mutate(study_effort, diff_w_group_query = n_pubmed_spname - n_pubmed_spname_group)%>%
+        arrange(desc(diff_w_group_query)), 15)
+```
+
+Are the number of pubmed hits correlated with the number of publications on a given species in the life cycle database? It is, but it is noisy, which is not too surprising, as I was not trying to be exhaustive when compiling the database.
+
+```{r}
+ggplot(study_effort, aes(x = n_lcdb, y = n_pubmed_spname)) + 
+  geom_point(alpha = 0.2) + 
+  geom_smooth() +
+  scale_y_log10() + scale_x_log10()
+```
+
+
+
+# Host range by study effort correlation
+```{r}
+host_range <- select(dat_host, Parasite.species, Host.species)%>%
+  distinct()%>%
+  group_by(Parasite.species)%>%
+  summarise(hosts = n())
+
+```
+```{r}
+study_effort2 <- left_join(study_effort, host_range)
+```
+
+```{r}
+ggplot(study_effort2, aes(x = n_lcdb, y = hosts)) + 
+  geom_point(alpha = 0.2) + geom_smooth()
+
+```
+```{r}
+ggplot(study_effort2, aes(x = log10(n_pubmed_spname+1), y = hosts)) + 
+  geom_point(alpha = 0.2) + geom_smooth()
+```
+
+
