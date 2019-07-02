@@ -1,0 +1,63 @@
+---
+title: "get H-P records"
+author: "Dan Benesh"
+date: "7/2/2019"
+output: html_document
+---
+
+This script collects the host lists for parasite species in the life cycle database.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(helminthR)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r importdata}
+dat_host <- read.csv(file = "../data/CLC_database_hosts.csv", header = TRUE)
+```
+
+First create variables to query the NHM database.
+
+```{r}
+p_sp <- unique(dat_host$Parasite.species) # parasite species 
+
+p_sp2 <- strsplit(p_sp, " ")
+genus <- unlist(lapply(p_sp2, function(x){x[1]})) # genus character vector
+species <- unlist(lapply(p_sp2, function(x){x[2]})) # species character vector
+
+group <- select(dat_host, Parasite.species, Parasite.group)%>%
+  mutate(group2 = if_else(Parasite.group == 'nematode', "Nematodes",
+                          if_else(Parasite.group == 'cestode', 'Cestodes', 'Acanthocephalans')))%>%
+  distinct()
+group <- group$group2 # group vector
+```
+
+Loop over species in the database, compile host list dataframe.
+
+```{r}
+for(i in seq_along(genus)){
+  
+  # get hosts from NHM H-P database
+  host_output <- findParasite(genus = genus[i], species = species[i], group = group[i])
+  cat(length(host_output$Host), "host records for", genus[i], species[i],'\n', sep = " ")
+  
+  if(i == 1){
+    host_output_combined <- host_output
+  } else {
+    host_output_combined <- bind_rows(host_output_combined, host_output)
+  }
+  
+}
+```
+
+```{r}
+write.csv(host_output_combined, file = "../data/NHM_db_hosts.csv", row.names = F)
+```
+
+
+
