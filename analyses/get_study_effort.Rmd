@@ -177,4 +177,25 @@ ggplot(study_effort2, aes(x = log10(n_pubmed_spname+1), y = hosts)) +
   geom_point(alpha = 0.2) + geom_smooth()
 ```
 
+```{r}
+write.csv(study_effort, file = "../data/study_effort.csv", row.names = F)
+```
+
+# Google Scholar - does not work
+
+```{r}
+library(rvest)
+```
+```{r}
+# base_url <- 'https://scholar.google.de/'
+# query <- "Acanthocephalus+lucii"
+# 
+# test_page <- paste0(base_url, "?hl=en&as_sdt=0%2C5&q=", query, "&btnG=")
+# 
+# page <- read_html(test_page)
+# 
+# hits <- html_node(page, '.gs_ab_mdw')
+# hits_txt <- html_text(hits)
+```
+
 
