@@ -1,0 +1,178 @@
+---
+title: "Fig3"
+author: "Dan Benesh"
+date: "9/18/2019"
+output: html_document
+---
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ape)
+library(RColorBrewer)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r importdata}
+lcdb <- read.csv(file = "../data/CLC_database_updated_names.csv", header = TRUE)
+st_level <- read.csv(file = "../data/stage_level_combined.csv", header = TRUE)
+```
+```{r}
+# create starting sizes
+st_level <- rename(st_level, stage_length_end = stage_body_length, stage_biov_end = stage_biov)%>%
+  mutate(stage_length_start = stage_length_end - abs_growth_len,
+         stage_biov_start = stage_biov_end - abs_growth_biov)
+```
+```{r}
+st_level <- mutate(st_level, rel_growth_paratenic = if_else(Facultative == "paratenic" & is.na(rel_growth_biov), 0, rel_growth_biov)) # if paratenic, then growth = 0
+st_level <- mutate(st_level, avg_dd_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dd), 20, avg_dd)) # if paratenic, then dt = 0
+```
+```{r}
+st_level <- mutate(st_level, Host_no_fac = if_else(Host.no > 4, as.integer(4), Host.no))%>%
+  mutate(Host_no_fac = factor(Host_no_fac))
+```
+```{r}
+st_level <- mutate(st_level, paratenic = if_else(Facultative == "paratenic", "yes", "no"))
+```
+
+
+## Include paratenics
+
+The differences might be a little clearer when we break the data by taxonomic rank.
+
+```{r}
+st_level <- mutate(st_level, generalist_fac = cut(hsi_lcdb_suspcious_rem, breaks = c(0, 1, 2, 3, 4, 6)))%>% # cut tax dissim by tax hierarchy
+  mutate(generalist_fac = factor(generalist_fac, labels = c("species", "genus", "family", "order", "class+")))
+```
+```{r}
+st_level_dt <- group_by(st_level, generalist_fac)%>%
+  summarize(avg_dd_p = mean(log10(avg_dd_paratenic), na.rm = T),
+            sd_dd_p = sd(log10(avg_dd_paratenic), na.rm = T),
+            n_dt = sum(!is.na(avg_dd_paratenic)),
+            
+            avg_g_p = mean(rel_growth_paratenic, na.rm = T),
+            sd_g_p = sd(rel_growth_paratenic, na.rm = T),
+            n_g = sum(!is.na(rel_growth_paratenic))
+            )
+st_level_dt <- mutate(st_level_dt, se_dd_p = sd_dd_p/sqrt(n_dt), se_g_p = sd_g_p/sqrt(n_g))%>%na.omit()
+```
+
+If parasite stages infect hosts from different classes, then they exhibit short development and little growth. By contrast, if hosts for a given parasite stage tend to be of the same genus or family, then the parasite stage tend to spend time growing.
+
+```{r}
+# mypal <- brewer.pal(9, "PuRd")
+# mypal <- mypal[c(3,5,6,8,9)]
+# tried to color points with sequential palette, but it did not work so well
+```
+
+```{r}
+f3a <- ggplot(st_level, aes(x = avg_dd_paratenic, y = rel_growth_paratenic)) +
+  scale_x_log10() + 
+  geom_point(aes(shape = paratenic), alpha = 0.1) +
+  geom_point(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p, color = generalist_fac),
+             alpha = 0.75, size = 2.5) +
+  geom_errorbar(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p, 
+                                        ymin = avg_g_p - 1.96*se_g_p, ymax = avg_g_p + 1.96*se_g_p,
+                                        color = generalist_fac),
+                alpha = 0.75, size = 1, width = 0) +
+  geom_errorbarh(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p,
+                                         xmin = 10^(avg_dd_p - 1.96*se_dd_p), 
+                                         xmax = 10^(avg_dd_p + 1.96*se_dd_p),
+                                         color = generalist_fac), 
+                alpha = 0.75, size = 1, height = 0) +
+  scale_shape_manual(values = c(16,17)) +
+  scale_color_brewer(type = 'qual', palette = "Dark2") +
+  # scale_color_manual(values = mypal) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(y = "Relative growth\n(orders of magnitude size increase)", x = "Development time (degree days)", 
+       shape = "Paratenic host?", color = "Taxonomic\ndissimilarity") +
+  guides(shape = guide_legend(override.aes = list(size = 4, alpha = 0.25))) +
+  annotate(geom = 'text', label = '(a)', x = min(st_level$avg_dd_paratenic, na.rm=T), y = max(st_level$rel_growth_paratenic, na.rm=T) )
+f3a
+```
+
+Here's the same figure, excluding paratenics. The separation along the x-axis is no longer obvious, but the relationship with growth is still visible.
+
+```{r}
+st_level_dt <- group_by(st_level, generalist_fac)%>%
+  summarize(avg_dd_p = mean(log10(avg_dd), na.rm = T),
+            sd_dd_p = sd(log10(avg_dd), na.rm = T),
+            n_dt = sum(!is.na(avg_dd)),
+            
+            avg_g_p = mean(rel_growth_biov, na.rm = T),
+            sd_g_p = sd(rel_growth_biov, na.rm = T),
+            n_g = sum(!is.na(rel_growth_biov))
+            )
+st_level_dt <- mutate(st_level_dt, se_dd_p = sd_dd_p/sqrt(n_dt), se_g_p = sd_g_p/sqrt(n_g))%>%na.omit()
+```
+
+```{r}
+f3b <- ggplot(st_level, aes(x = avg_dd, y = rel_growth_biov)) +
+  scale_x_log10() + 
+  geom_point(aes(shape = paratenic), alpha = 0.1) +
+  geom_point(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p, color = generalist_fac),
+             alpha = 0.75, size = 2.5) +
+  geom_errorbar(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p, 
+                                        ymin = avg_g_p - 1.96*se_g_p, ymax = avg_g_p + 1.96*se_g_p,
+                                        color = generalist_fac), 
+                alpha = 0.75, size = 1, width = 0) +
+  geom_errorbarh(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p,
+                                         xmin = 10^(avg_dd_p - 1.96*se_dd_p), 
+                                         xmax = 10^(avg_dd_p + 1.96*se_dd_p),
+                                         color = generalist_fac), 
+                 alpha = 0.75, size = 1, height = 0) +
+  scale_shape_manual(values = c(16,17)) +
+  scale_color_brewer(type = 'qual', palette = "Dark2") +
+  theme(panel.grid.minor = element_blank()) +
+  labs(y = "Relative growth\n(orders of magnitude size increase)", x = "Development time (degree days)", 
+       shape = "Paratenic host?", color = "Taxonomic\ndissimilarity") +
+  guides(shape = guide_legend(override.aes = list(size = 4, alpha = 0.25))) +
+  annotate(geom = 'text', label = '(b)', x = min(st_level$avg_dd, na.rm=T), y = max(st_level$rel_growth_biov, na.rm=T) )
+f3b
+
+```
+
+Combine the two plots.
+
+```{r}
+# library(cowplot)
+```
+
+```{r}
+# f3a2 <- f3a + 
+#   guides(color = FALSE, shape = FALSE)
+# 
+# f3b2 <- f3b +
+#   theme(axis.text.y = element_blank(),
+#   axis.title.y = element_blank())
+```
+
+```{r}
+# # ap <- align_plots(f3a2, f3b2, align="hv")
+# 
+# f3c <- gridExtra::grid.arrange(f3a2, f3b2, nrow = 1)
+# 
+# f3c <- gridExtra::grid.arrange(ap[[1]], ap[[2]], nrow = 1)
+```
+
+
+Export as SVG and PNG, first Fig 3a...
+
+```{r}
+fig_width <- 6
+fig_height <- 4.5
+
+ggsave(filename = "../figs/Fig3a.svg", plot = f3a, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig3a.png", plot = f3a, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
+
+...then Fig 3b.
+
+```{r}
+ggsave(filename = "../figs/Fig3b.svg", plot = f3b, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig3b.png", plot = f3b, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
+

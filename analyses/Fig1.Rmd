@@ -1,0 +1,120 @@
+---
+title: "Fig1"
+author: "Dan Benesh"
+date: "9/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+I used data from several sources: (1) [life cycle database]() (for parasite life cycle lengths and host records), (2) host-parasite database from the NHM London (to acquire a more exhaustive list of host records for each parasite), (3) genbank sequences (to make a parasite phylogeny), (4) NCBI taxonomy database (to get the basic taxonomic hierarchy for every host species), and (5) PubMed (to estimate study effort on each parasite species).
+
+```{r importdata}
+lcdb <- read.csv(file = "../data/CLC_database_updated_names.csv", header = TRUE)
+dat <- read.csv(file = "../data/spp_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "parasite_phylogeny/full_tree_time_calib.nex")
+tip_names <- read.csv(file = "../data/data_tree_tips_table.csv")
+```
+
+```{r}
+dat <- left_join(dat, tip_names)
+dat <- left_join(dat, select(lcdb, Parasite.species, Parasite.group)%>%distinct())
+dat <- mutate(dat, lcl_max_fac = as.character(lcl_max))%>%
+  mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
+```
+
+```{r}
+# make variable to remove species with incomplete life cycle information
+incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
+  select(Parasite.species)%>%
+  distinct()
+dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "not facultative"),
+              partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
+                                           "partial", "complete"))
+```
+
+```{r}
+# # run this block to exclude species with partial life cycles! 
+dat <- filter(dat, partial_cycle != "partial")
+tree <- keep.tip(tree, tip = dat$tree_tips)
+```
+
+```{r}
+row.names(dat) <- dat$tree_tips # set row names to same as tree tip labels
+```
+
+Number of species
+```{r}
+length(unique(dat$Parasite.species))
+```
+Number of host records
+```{r}
+sum(dat$num_hosts_lcdb_nhm)
+```
+
+```{r}
+names(dat)
+```
+
+The first figure: life cycle length vs host range.
+
+```{r}
+f1a <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+             aes(size = pubs_pubmed_spname_group)) +
+  scale_y_log10() +
+  labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits") +
+  guides(size = FALSE) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm))
+f1a
+```
+
+The second figure: life cycle length vs tax dissimilarity.
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+
+```{r}
+f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+             aes(size = pubs_pubmed_spname_group)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index", size = "Pubmed hits") +
+  theme(legend.position = c(0.98, 0.02),
+        legend.justification = c(1,0),
+        legend.background = element_rect(color = 'black'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb))
+f1b
+```
+
+Export as SVG and PNG, first Fig 1a...
+
+```{r}
+fig_width <- 4.5
+fig_height <- 4.5
+
+ggsave(filename = "../figs/Fig1a.svg", plot = f1a, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig1a.png", plot = f1a, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
+
+...then Fig 1b.
+
+```{r}
+ggsave(filename = "../figs/Fig1b.svg", plot = f1b, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig1b.png", plot = f1b, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
