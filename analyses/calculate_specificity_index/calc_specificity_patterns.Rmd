@@ -1,0 +1,212 @@
+---
+title: "Host specificity analyses - calculate and analyze host specificity"
+output: github_document
+---
+
+Here I calculate a host specificity index proposed by [Poulin and Mouillot 2003](https://doi.org/10.1017/S0031182003002993) that accounts for the taxonomic similarity of hosts. 
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(RColorBrewer)
+
+options(stringsAsFactors = FALSE)
+```
+
+To start, I load and combine host records. I keep records from the life cycle database and from nhm separate at first. 
+
+```{r}
+# load host-parasite records
+lcdb <- read.csv(file="../../data/CLC_database_updated_names.csv", header = TRUE, sep=",")
+nhm <- read.csv(file="../../data/NHM_db_hosts_updated_names.csv", header = TRUE, sep=",")
+# load host taxonomy
+host.tax <- read.csv(file="../../data/ncbi_host_taxonomy.csv", header = TRUE, sep=",") # taxonomy from NCBI
+```
+```{r}
+lcdb$db <- 'lcdb'
+nhm$db <- 'nhm'
+
+lcdb_nhm_records <- bind_rows(select(lcdb, Parasite.species, Host.species, best_host_name, db),
+                              select(nhm, Parasite.species, Host.species, best_host_name, db))%>%
+  filter(!is.na(best_host_name))
+```
+
+I add the downloaded NCBI taxonomy to the host records.
+
+```{r, message=FALSE, warning=FALSE}
+dataH <- left_join(lcdb_nhm_records, 
+                   select(host.tax, sp.query, genus, family, order, class, phylum)%>%distinct(),
+                   by = c("best_host_name" = "sp.query"))
+```
+
+This is how much missing taxonomic data is in the combined table.
+
+```{r, message=FALSE, warning=FALSE}
+sapply(select(dataH, Host.species, genus:phylum), function(x) sum(is.na(x)))
+```
+
+This is a little inflated, because host species without taxonomy that are recorded from multiple parasites will be counted multiple times. How many unique species are missing their taxonomy?
+
+```{r}
+length(unique(filter(dataH, is.na(phylum))$best_host_name))
+```
+
+What percent of the total host species is this?
+
+```{r}
+length(unique(filter(dataH, is.na(phylum))$best_host_name)) / length(unique(dataH$best_host_name))
+```
+
+Only a minor number of hosts are missing taxonomic information. They need to be removed to calculate a specificity index, because we need a full taxonomic hierarchy for each entry, otherwise specificity calculations are not comparable. Before removing them, though, let's count how many hosts are missing taxonomic info for each parasite species.
+
+```{r}
+hosts_missing_taxonomy_lcdb <- filter(dataH, db == 'lcdb')%>%
+  group_by(Parasite.species)%>%
+  mutate(tax_miss = if_else( is.na(genus) | is.na(family) | is.na(order) | is.na(class) | is.na(phylum),
+                             1, 0))%>%
+  summarize(hosts_missing_tax_lcdb = sum(tax_miss))
+```
+```{r}
+hosts_missing_taxonomy_comb <- filter(dataH, Parasite.species %in% lcdb$Parasite.species)%>%
+  group_by(Parasite.species)%>%
+  mutate(tax_miss = if_else( is.na(genus) | is.na(family) | is.na(order) | is.na(class) | is.na(phylum),
+                             1, 0))%>%
+  select(Parasite.species, best_host_name, tax_miss)%>%
+  distinct()%>%
+  summarize(hosts_missing_tax_comb = sum(tax_miss))
+```
+```{r}
+# dataframe summarizing how many hosts are missing taxonomic info
+hosts_missing_taxonomy <- left_join(hosts_missing_taxonomy_lcdb, hosts_missing_taxonomy_comb)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# remove hosts missing taxonomic info
+phy.hs <- select(dataH, Parasite.species, best_host_name, db,
+                 genus, family, order, class, phylum)%>%
+  filter(!is.na(genus) , !is.na(family) , !is.na(order) , !is.na(class) , !is.na(phylum))
+```
+
+We want to calculate the host specificity index twice, once for just the lcdb and once for the combined data.
+
+```{r}
+phy_hs_lcdb <- filter(phy.hs, db == 'lcdb')
+phy_hs_comb <- select(phy.hs, -db)%>%distinct()
+phy_hs_comb <- filter(phy_hs_comb, Parasite.species %in% lcdb$Parasite.species) # remove parasite species in nhm but not lcdb
+```
+
+We load a couple functions from an external file for calculating the taxonomic specificity index.
+
+```{r, message=FALSE, warning=FALSE}
+source("host_specificity_index_calculation_functions.R")
+```
+
+Then we loop through all the parasite species to calculate the host specificity index. First, we loop through the records in the life cycle database.
+
+```{r, message=FALSE, warning=FALSE}
+spst <- select(phy_hs_lcdb, Parasite.species)%>%distinct() # unique parasite spp after removing hosts with missing tax data
+spst$hsi_lcdb <- NA # numeric to collect calculated host specificity index
+spst$var.hsi_lcdb <- NA # numeric to collect calculated variation in host specificity index
+
+for(i in seq_along(spst$Parasite.species)){
+  mv <- spst[i,]
+  ds <- filter(phy_hs_lcdb, Parasite.species == mv$Parasite.species)
+  hsi_lcdb.out <- with(ds, hs.index(best_host_name, genus, family, order, class, phylum)) # calc host spec index
+  spst$hsi_lcdb[i] <- hsi_lcdb.out[1]
+  spst$var.hsi_lcdb[i] <- hsi_lcdb.out[2]
+  rm(mv, ds, hsi_lcdb.out, i)
+}
+# two notes: host spec values include atypical species and they were calculated omitting hosts without full tax info
+```
+
+And then we do the same for the full, combined dataset.
+
+```{r}
+spst2 <- select(phy_hs_comb, Parasite.species)%>%distinct() # unique parasite spp after removing hosts with missing tax data
+spst2$hsi_comb <- NA # numeric to collect calculated host specificity index
+spst2$var.hsi_comb <- NA # numeric to collect calculated variation in host specificity index
+
+for(i in seq_along(spst2$Parasite.species)){
+  mv <- spst2[i,]
+  ds <- filter(phy_hs_comb, Parasite.species == mv$Parasite.species)
+  hsi_comb.out <- with(ds, hs.index(best_host_name, genus, family, order, class, phylum)) # calc host spec index
+  spst2$hsi_comb[i] <- hsi_comb.out[1]
+  spst2$var.hsi_comb[i] <- hsi_comb.out[2]
+  rm(mv, ds, hsi_comb.out, i)
+}
+```
+
+After calculating the index for both datasets, we combine the output into a single table and export it to file.
+
+```{r}
+hsi_dat <- left_join(hosts_missing_taxonomy, spst)
+hsi_dat <- left_join(hsi_dat, spst2)
+write.csv(hsi_dat, file = "../../data/taxonomic_dissimilarity_index_sp_level.csv", row.names = FALSE)
+```
+
+The correlation between the index values are similar when calculated with just the life cycle database or with the two combined datasets. At the extremes, though, they can diverge. High index values calculated with lcdb were often lower when calculated with the combined dataset, suggesting that adding the nhm records resulted in more taxonomic similarity among the hosts. The opposite was true too (low hsi_lcdb was higher in the combined dataset), indicating the addition of dissimilar species by the nhm when the lcdb suggested it was a specialist.
+
+```{r}
+ggplot(hsi_dat, aes(x = hsi_lcdb, y = hsi_comb)) + geom_point(alpha = 0.2) + geom_smooth()
+```
+
+A similar pattern is seen in the variation in the index; at the edges, the datasets differ more.
+
+```{r}
+ggplot(hsi_dat, aes(x = var.hsi_lcdb, y = var.hsi_comb)) + geom_point(alpha = 0.2)
+```
+
+Let's look at how this host specificity index is related to the other variables in our dataset.
+
+```{r}
+sp_level <- read.csv(file = "../../data/spp_level_combined.csv") # load spp level dataframe
+sp_level <- left_join(sp_level, hsi_dat)
+```
+
+The number of hosts (host range) and the host specificity index were not correlated.
+
+```{r}
+ggplot(sp_level, aes(x = log10(num_hosts_lcdb_nhm), y = hsi_comb)) + geom_point(alpha = 0.2) + geom_smooth(se=F)
+```
+
+Variation in the index was larger with few host records, as we would expect.
+
+```{r}
+ggplot(sp_level, aes(x = log10(num_hosts_lcdb_nhm), y = var.hsi_comb)) + geom_point(alpha = 0.2) + geom_smooth(se=F)
+```
+
+The index is not related to study effort.
+
+```{r}
+ggplot(sp_level, aes(x = log10(pubs_pubmed_spname_group+1), y = hsi_comb)) +
+  geom_point(alpha = 0.2) + geom_smooth(se = F)
+```
+
+Host dissimilarity increases with life cycle length.
+
+```{r}
+ggplot(sp_level, aes(x = factor(lcl_max), y = hsi_comb)) +
+  geom_boxplot(outlier.colour = NA) + 
+  geom_point(alpha = 0.2, position = 'jitter')
+```
+
+```{r}
+sp_level <- left_join(sp_level, select(lcdb, Parasite.species, Parasite.group)%>%distinct())
+```
+But this is mostly due to nematodes. Actually, there is little difference between worms with 2 and 3 host life cycles.
+
+```{r}
+ggplot(sp_level, aes(x = factor(lcl_max), y = hsi_comb)) +
+  geom_boxplot(outlier.colour = NA) + 
+  geom_point(alpha = 0.2, position = 'jitter') + 
+  facet_grid(~Parasite.group)
+```
+
+The variation in the index decreases among complex life cycle parasites, which I'm not sure how to interpret.
+
+```{r}
+ggplot(sp_level, aes(x = factor(lcl_max), y = var.hsi_comb)) +
+  geom_boxplot(outlier.colour = NA) + 
+  geom_point(alpha = 0.2, position = 'jitter')
+```
