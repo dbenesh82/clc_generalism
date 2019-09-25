@@ -1,0 +1,378 @@
+---
+title: "Correct host names, find synonyms"
+author: "Dan Benesh"
+date: "8/7/2019"
+output: html_document
+---
+
+The goal of this script is to correct the taxonomic names in the NHM dataset. I check for misspellings with the GNR service and then check to see if names are accepted (i.e. not synonyms) in COL.
+
+```{r setup, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(taxize)
+
+options(stringsAsFactors = FALSE)
+```
+
+```{r importdata}
+dat_host <- read.csv(file="../../data/CLC_database_hosts.csv", header = TRUE, sep=",")
+dat_nhm <- read.csv(file = "../../data/NHM_db_hosts.csv", header = TRUE)
+```
+
+```{r}
+# clean up NHM data
+dat_nhm_red <- filter(dat_nhm, !grepl(pattern = "^\\(", Host))%>% # remove vague host records starting with parentheses
+  filter(!grepl(pattern = "^\\[", Host))%>% # remove vague host records starting with bracket
+  select(Parasite.species = Parasite, Host.species = Host)
+```
+
+```{r}
+# LCDB host records
+dat_host_red <- filter(dat_host, !is.na(Host.species), !is.na(Host.common.name))%>%
+  select(Parasite.species, Host.species)
+```
+```{r}
+# combine NHM and LCDB host records
+dat_lcdb_nhm <- bind_rows(dat_host_red, dat_nhm_red)%>%distinct()
+```
+```{r}
+# remove subgenera from host names
+dat_lcdb_nhm <- mutate(dat_lcdb_nhm, Host.species = gsub(pattern = "\\(.*\\) ", replacement = "", Host.species))
+```
+
+
+```{r}
+# manually correct some host records; things not found by GNR in first go
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Acitits macularia")] <- "Actitis macularius"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Atelexia albiventris")] <- "Atelerix albiventris"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Centophilus sp.")] <- "Ceuthophilus sp."
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Candonia ")] <- "Candona sp."
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Cincindella erudata")] <- "Cicindela erudata"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Cincindella sexpunctata")] <- "Cicindela sexpunctata"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Cincindella vigintigutta")] <- "Cicindela vigintigutta"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Chelodina Iongicollis")] <- "Chelodina longicollis"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Cionella Iubrica")] <- "Cionella lubrica"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Coryphilla sp.")] <- "Coryphella sp."
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Cylindrojulus sp.")] <- "Cylindroiulus sp."
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Dusycion culpaeus")] <- "Lycalopex culpaeus"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Dusycion griseus")] <- "Lycalopex griseus"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Helodrillus ")] <- "Helodrilus"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Lepidocirtus sp.")] <- "Lepidocyrtus sp."
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "M?n???lephorus rubroniveus")] <- "Monopylephorus rubroniveus"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Meleagridis gallopavo silvestris")] <- "Meleagris gallopavo"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Ototylomysphyllotis phyllotis")] <- "Ototylomys phyllotis"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Paracylopina sp.")] <- "Paracyclopina sp."
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Pleurdonte sagemon")] <- "Pleurodonte sagemon"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Procyonis lotor")] <- "Procyon lotor"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Tenebriodes nana")] <- "Tenebroides nana"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Thryrissa hamiltoni")] <- "Thryssa hamiltonii"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Thylacine cynocephalus")] <- "Thylacinus cynocephalus"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Trichorythodes")] <- "Tricorythodes"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Utorides striatus")] <- "Butorides striata"
+dat_lcdb_nhm$Host.species[which(dat_lcdb_nhm$Host.species == "Exorbatula sp. cf. biundatus")] <- "Exoribatula sp."
+```
+
+```{r}
+# replace all instances of spp. with sp.
+dat_lcdb_nhm <- mutate(dat_lcdb_nhm, Host.species = gsub("spp\\.", "sp\\.", Host.species))
+```
+
+```{r}
+# remove trailing white space in host names
+dat_lcdb_nhm <- mutate(dat_lcdb_nhm, Host.species = gsub("\\s+$", "", Host.species)) 
+```
+
+```{r}
+# add 'sp.' to all instances of just genera given, e.g. 'Gammarus' is changed to 'Gammarus sp.'
+dat_lcdb_nhm <- mutate(dat_lcdb_nhm, Host.species = if_else( !grepl(" ", Host.species), # if 1 word host name, add sp.
+                                                             paste(Host.species, "sp."),
+                                                             Host.species))
+```
+
+```{r}
+# remove records that are hybrids
+dat_lcdb_nhm <- filter(dat_lcdb_nhm, !grepl("hybrid$", Host.species))
+```
+
+```{r}
+# remove subspecies names; don't query them
+hname_nosubspp <- unlist(
+  lapply(strsplit(dat_lcdb_nhm$Host.species, " "), 
+         function(x){ifelse(length(x) == 1, x[1], paste(x[1],x[2]))})
+)
+
+dat_lcdb_nhm$host_sp_no_subsp <- hname_nosubspp
+```
+
+```{r}
+# add genus var to data
+dat_lcdb_nhm <- mutate(dat_lcdb_nhm, h.genus = unlist(strsplit(as.character(Host.species), split=" .*$")))
+```
+
+After cleaning the host-parasite records, we can isolate the unique host data, and then use that to query the taxonomic info.
+
+```{r, message=FALSE, warning=FALSE}
+dataH <- select(dat_lcdb_nhm, Host.species, host_sp_no_subsp, h.genus)%>%distinct()
+```
+
+```{r}
+# get the set of host species and host genera
+h.sp.vec <- unique(dataH$host_sp_no_subsp)
+h.sp.vec <- sort(na.omit(h.sp.vec))
+
+# g.sp.vec <- unique(dataH$h.genus)
+# g.sp.vec <- sort(na.omit(g.sp.vec))
+```
+
+Check for the misspelled names with GNR.
+
+```{r}
+name_corrections <- gnr_resolve(h.sp.vec, canonical = T, best_match_only = T, 
+                                with_context = T, # should recognize that it is list of animals, not plants, fungi
+                                #preferred_data_sources = c(1, 4) # can restrict results to COL, NCBI, ITIS, WORMS
+                                )
+```
+
+```{r}
+save.image("workspace_after_tax_corrections.RData")
+```
+
+Which names were changed?
+
+```{r}
+rename(name_corrections, corrected_name = matched_name2)%>%
+  filter(submitted_name != corrected_name)%>%
+  select(submitted_name, corrected_name)
+```
+
+Often small spelling mistakes, but sometimes a species was reduced to a genus name. 
+
+```{r}
+rename(name_corrections, corrected_name = matched_name2)%>%
+  filter(submitted_name != corrected_name, !grepl(" ", corrected_name))%>%
+  select(submitted_name, corrected_name)
+```
+
+I want to use the species name to query the COL database, not just the genus name, so change it back to the species name for querying.
+
+```{r}
+dataH <- left_join(dataH, 
+                   select(name_corrections, submitted_name, data_source_title, gnr_corrected_name = matched_name2),
+                   by = c("host_sp_no_subsp" = "submitted_name"))
+
+dataH <- mutate(dataH, query_name = if_else(host_sp_no_subsp != gnr_corrected_name & !grepl(" ", gnr_corrected_name), # if sp name reduced to genus, then return sp name
+                                            host_sp_no_subsp, gnr_corrected_name))
+```
+
+Which names were not found by GNR?
+
+```{r}
+h.sp.vec[!(h.sp.vec %in% name_corrections$user_supplied_name)]
+```
+
+For names not found, use the unchanged name as query. It will not be found by COL, but it will allow more complete table joining later.
+
+```{r}
+dataH <- mutate(dataH, query_name = if_else(is.na(query_name), host_sp_no_subsp, query_name))
+```
+
+Take the vector of unique-and-now-corrected names, and use it look for accepted names. In other words, we want to replace synonyms with valid names.
+
+```{r}
+corrected_names <- sort(na.omit(unique(dataH$query_name)))
+```
+
+Here is code to do that with the ITIS database. However, this database did not return as many corrected names as COL. Moreover, COL uses ITIS as a data source. Thus, it is probably not necessary to get synonyms from both ITIS and COL.
+
+```{r}
+# # make df of data returned by ITIS
+# names_df_itis <- data.frame(query = corrected_names[1:200])
+# names_df_itis$db <- "itis"
+```
+
+```{r}
+# itis_syn <- synonyms(x = corrected_names[1:200], db = "itis", rows = 1)
+# 
+# # get submitted ids
+# sub_tsn <- lapply(itis_syn, 
+#                   function(x){ifelse(class(x) == "data.frame", x$sub_tsn[1], "NA")}
+#                   )
+# # get accepted ids
+# acc_tsn <- lapply(itis_syn, 
+#                   function(x){ifelse(class(x) == "data.frame", x$acc_tsn[1], "NA")}
+#                   )
+# 
+# # new names
+# new_name <- lapply(itis_syn, 
+#                   function(x){ifelse(class(x) == "data.frame", 
+#                                      ifelse(x$acc_tsn[1] != x$sub_tsn[1], x$acc_name[1], "NA"),
+#                                      "NA")}
+#                   )
+# 
+# 
+# names_df_itis$ids_query <- unlist(sub_tsn)
+# names_df_itis$ids_accepted_name <- unlist(acc_tsn)
+# names_df_itis$changed_name <- unlist(new_name)
+# names_df_itis <- mutate(names_df_itis, valid_name = if_else(ids_query != ids_accepted_name, changed_name, query))
+```
+
+Get accepted names and taxonomy from COL. First, get the ids for each name in COL, and then pull the classification scheme for those ids.
+
+```{r}
+names_df_col <- data.frame(query = corrected_names)
+names_df_col <- mutate(names_df_col, query_genus = if_else(!grepl(pattern = " ", query), query,
+                                           substr(query, start = 1, stop = regexpr(pattern = " ", query)-1)))
+names_df_col$db <- "col"
+```
+
+
+```{r}
+col_ids <- get_colid(corrected_names, ask = F) # returns id of accepted name, not synonym!
+# by using ask=F I ignore species with multiple ids in COL, such as if they are a valid name but have also been synonyms of other species, essentially I'm just taking clear synonyms
+names_df_col$ids_db <- col_ids
+```
+
+```{r}
+save.image("workspace_after_tax_corrections.RData")
+```
+
+```{r}
+# # synonyms function does not return accepted name, just synonyms!
+# col_syn <- synonyms(x = corrected_names[1:20], db = "col", ask = F, rows = 1)
+# 
+# str(col_syn)
+# col_syn[[6]]
+```
+
+
+```{r}
+col_class <- classification(id = col_ids, db = 'col') # classification returns taxonomy and 
+```
+
+```{r}
+save.image("workspace_after_tax_corrections.RData")
+```
+
+The classification scheme is returned as a list. Format it to a df.
+
+```{r}
+rm(sp_tax_long)
+for(i in seq_along(col_class)){
+  id <- names(col_class)[i]
+  if(class(col_class[[i]]) != "data.frame") {
+    next
+  } else {
+    sp_tax <- col_class[[i]]
+    sp_tax$query_id <- id
+    
+    if(exists("sp_tax_long")){
+      sp_tax_long <- bind_rows(sp_tax_long, sp_tax)
+    } else {
+      sp_tax_long <- sp_tax
+    }
+  }
+}
+
+```
+
+```{r}
+sp_tax_wide <- select(sp_tax_long, name, rank, query_id)%>%
+  distinct()%>%
+  spread(rank, name)%>%
+  select(query_id, species, genus, family, order, class, phylum, kingdom)
+
+names_df_col <- left_join(names_df_col, sp_tax_wide, by = c("ids_db" = "query_id"))
+
+```
+
+After making the df, makes new variables showing which records were changed/updated by COL.
+
+```{r}
+# make var of changed names
+names_df_col$changed_name <- NA
+names_df_col$changed_name[which(names_df_col$query_genus != names_df_col$genus)] <- names_df_col$genus[which(names_df_col$query_genus != names_df_col$genus)] # mismatched genera
+names_df_col$changed_name[which(names_df_col$query != names_df_col$species)] <- names_df_col$species[which(names_df_col$query != names_df_col$species)] # mismatched sp names
+
+# select(names_df_col, query, changed_name, species, genus, family) # check names that were changed
+
+```
+
+```{r}
+# make var of valid names
+names_df_col$valid_name <- names_df_col$genus # if genus, put genus as valid name
+names_df_col$valid_name[!is.na(names_df_col$species)] <- names_df_col$species[!is.na(names_df_col$species)] # if species, overwrite genus
+names_df_col$valid_name[!is.na(names_df_col$changed_name)] <- names_df_col$changed_name[!is.na(names_df_col$changed_name)] # if name changed, overwrite species
+```
+
+```{r}
+# select(names_df_col, query, species, changed_name, valid_name)
+filter(names_df_col, query != valid_name)%>%select(query, valid_name) # about 1000 species had name update by COL
+```
+
+```{r}
+# filter(names_df_col, grepl("sp\\.", query))%>%select(query, species, valid_name) # most 'Genus sp.' records do not return a COL id, but a few do, which is a problem
+```
+
+```{r}
+# these look incorrect - a query at the genus level returning species level name
+filter(names_df_col, grepl("sp\\.", query), !is.na(species))%>%select(query, species, genus)
+```
+
+```{r}
+# assigning a species from genus sp. is not correct - reset these ones
+incorr <- with(names_df_col, which(grepl("sp\\.", query) & !is.na(species)))
+names_df_col[incorr, c("ids_db", "species", "genus", "family", "order", "class", "phylum", "kingdom", "changed_name", "valid_name")] <- NA
+```
+
+```{r}
+save.image("workspace_after_tax_corrections.RData")
+```
+
+
+Combine corrected, accepted names with the submitted names from host records into single df and output to file.
+
+```{r}
+dataH <- left_join(arrange(dataH, Host.species),
+                   select(names_df_col, -query_genus, db, col_id = ids_db,
+                          col_species = species, col_genus = genus, col_family = family,
+                          col_order = order, col_class = class, col_phylum = phylum,
+                          col_kingdom = kingdom, col_valid_name = valid_name), 
+                   by = c("query_name" = "query"))
+
+dataH <- rename(dataH, host_record_lcdb_nhm = Host.species, host_genus_lcdb_nhm = h.genus) # better var names
+
+dataH <- mutate(dataH, best_host_name = if_else(!is.na(col_valid_name), col_valid_name, query_name)) # best names
+```
+
+This table shows how names changed through the standardization steps: 1) remove subspp names, 2) gnr name to correct typos, 3) check name validity in COL, and 4) take the best name. Almost 25% of entries changed through this process.
+
+```{r}
+# this table shows how names changed through the different steps: 1) remove subspp names, 2) gnr name to correct typos, 3)  from record, to r
+filter(dataH, host_record_lcdb_nhm != best_host_name)%>%
+  select(host_record_lcdb_nhm, host_sp_no_subsp, query_name, col_valid_name, best_host_name)
+```
+
+```{r}
+write.csv(dataH, file = "../../data/host_names_corrected_valid.csv", row.names = F)
+```
+
+In addition to writing the host info to file, I also write the host-parasite data to file.
+
+```{r}
+names(dataH)
+# make consistent var names
+dat_lcdb_nhm <- rename(dat_lcdb_nhm, host_record_lcdb_nhm = Host.species, host_genus_lcdb_nhm = h.genus)
+# combine best host name with host-parasite records
+dat_lcdb_nhm <- left_join(dat_lcdb_nhm, 
+                          select(dataH, host_record_lcdb_nhm, best_host_name))
+```
+
+```{r}
+write.csv(dat_lcdb_nhm, file = "../../data/host_parasite_records_cleaned_names.csv", row.names = F)
+```
+```{r}
+save.image("workspace_after_tax_corrections.RData")
+```
+
