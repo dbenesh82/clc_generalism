@@ -1,0 +1,378 @@
+---
+title: "Host specificity at stage level"
+author: "Dan Benesh"
+date: "8/13/2019"
+output: html_document
+---
+
+Make dataset at stage level, write to file.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+I create a stage level dataframe that includes information on host specificity, taxonomic dissimilarity, life cycle length, growth in the stage, development in the stage, etc.
+
+```{r importdata}
+lcdb <- read.csv(file = "../../data/CLC_database_updated_names.csv", header = TRUE)
+sp_level <- read.csv(file = "../../data/spp_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "../parasite_phylogeny/full_tree_time_calib.nex")
+tip_names <- read.csv(file = "../../data/data_tree_tips_table.csv")
+```
+
+```{r}
+lcdb$Host.species[which(lcdb$Host.species=="NA sp.")] <- NA # some mistakes created when updating the host names in the LCDB
+```
+
+```{r}
+# add worm taxonomy to df
+acanth_tax <- read.csv("../parasite_phylogeny/acanth_taxonomy.csv")
+acanth_tax <- select(acanth_tax, species, genus, family, order, class, phylum)
+
+cest_tax <- read.csv("../parasite_phylogeny/cest_taxonomy.csv")
+cest_tax <- select(cest_tax, species, genus, family, order, class, phylum)
+
+nem_tax <- read.csv("../parasite_phylogeny/nem_taxonomy_rotl.csv")
+nem_tax <- select(nem_tax, species, genus, family, order, class, phylum)
+
+worm_tax <- rbind(acanth_tax, cest_tax, nem_tax)
+```
+```{r}
+lcdb <- left_join(lcdb, tip_names) # for matching the taxonomy
+lcdb <- mutate(lcdb, parasite_genus = substr(tree_tips, start = 1, stop = regexpr("_", tree_tips)-1))
+
+# join worm taxonomy based on genus name
+lcdb <- left_join(lcdb,
+                 select(worm_tax, parasite_genus = genus, parasite_family = family, parasite_order = order, parasite_class = class, parasite_phylum = phylum)%>%distinct(),
+                 by = 'parasite_genus')
+```
+
+
+This stage-level analysis is only with LCDB records. We remove entries like *Genus sp.* only if there are other hosts with the same genus. This avoids inflating host counts.
+
+# Host records
+
+```{r}
+# first run this for the lcdb dataset
+lcdb <- mutate(lcdb, best_genus = substr(best_host_name, 1, regexpr(" ", best_host_name)-1)) # make genus var
+
+rows_w_genussp <- which( grepl("sp\\.", lcdb$best_host_name)) # id rows to check
+
+
+# loop through rows to check, find cases where there are congenerics with the Genus sp. row
+rows_to_remove <- numeric()
+for(i in rows_w_genussp){
+  g_check <- lcdb[i, "best_genus"]
+  mv <- lcdb[i,]
+  ds <- filter(lcdb, Parasite.species == mv$Parasite.species, Stage == mv$Stage)
+  occ_of_genus <- sum(ds$best_genus == g_check, na.rm=T)
+  
+  if(occ_of_genus > 1) {
+    # if more than one occurrence of genus, mark row for removal
+    rows_to_remove <- c(rows_to_remove, i)
+  }
+}
+
+
+lcdb <- lcdb[-rows_to_remove,] # remove them
+```
+
+
+```{r}
+# make variable to remove species with incomplete life cycle information
+incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
+  select(Parasite.species)%>%
+  distinct()
+sp_level <- mutate(sp_level, partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
+                                           "partial", "complete"))
+rm(incomplete_lc)
+```
+
+
+```{r}
+# get host records at level of species stage
+hosts_per_stage <- filter(lcdb, !is.na(Host.species))%>%
+  select(Parasite.species, tree_tips, parasite_genus, parasite_family, parasite_order, parasite_class, parasite_phylum,
+         best_host_name, Host.no, Def.int, Stage, Facultative)%>%
+  distinct()%>%
+  group_by(Parasite.species, tree_tips, parasite_genus, parasite_family, parasite_order, parasite_class, parasite_phylum, Host.no, Def.int, Stage, Facultative)%>%
+  summarize(num_hosts_lcdb = n())
+```
+```{r}
+# # recalculate host records, but excluding cases where host id was not given
+# num_hosts2 <- filter(lcdb, !is.na(Host.species), !is.na(Host.common.name), Missing.info == 0)%>%
+#   select(Parasite.species, best_host_name, Host.no, Def.int, Stage)%>%
+#   distinct()%>%
+#   group_by(Parasite.species, Host.no, Def.int, Stage)%>%
+#   summarize(num_hosts_missing_removed = n())
+```
+
+```{r}
+# recalculate host records, but excluding cases where host record was suspicious
+num_hosts2 <- filter(lcdb, !is.na(Host.species), Missing.info == 0)%>%
+  select(Parasite.species, best_host_name, Host.no, Def.int, Stage)%>%
+  distinct()%>%
+  group_by(Parasite.species, Host.no, Def.int, Stage)%>%
+  summarize(num_hosts_suspicious_removed = n())
+```
+
+```{r}
+hosts_per_stage <- left_join(hosts_per_stage, num_hosts2)
+```
+
+```{r}
+hosts_per_stage$stage_missing_info <- "complete"
+hosts_per_stage$stage_missing_info[which(is.na(hosts_per_stage$num_hosts_suspicious_removed))] <- "all recorded hosts for stage uncertain"
+hosts_per_stage$stage_missing_info[which(hosts_per_stage$num_hosts_lcdb != hosts_per_stage$num_hosts_suspicious_removed)] <- "some host records for stage suspect"
+```
+
+
+# Species level vars
+
+```{r}
+# add species level variables
+hosts_per_stage <- left_join(hosts_per_stage, select(sp_level, Parasite.species, lcl_max, lcl_min, study_effort = pubs_pubmed_spname, partial_cycle))%>%
+  mutate(lcl_max_fac = as.character(lcl_max))%>%
+  mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
+```
+
+# Taxonomic dissimilarity
+
+```{r, message=FALSE, warning=FALSE}
+host.tax <- read.csv(file = "../../data/ncbi_host_taxonomy.csv", header = TRUE)
+
+lcdb <- left_join(lcdb, 
+                   select(host.tax, sp.query, host_genus = genus, host_family = family, host_order = order, host_class = class, host_phylum = phylum)%>%distinct(),
+                   by = c("best_host_name" = "sp.query"))
+```
+
+```{r}
+# number of host records missing taxonomic data
+miss_tax <- lcdb%>%
+  group_by(Parasite.species, Host.no, Def.int, Stage)%>%
+  mutate(tax_miss = if_else( is.na(host_genus) | is.na(host_family) | is.na(host_order) | is.na(host_class) | is.na(host_phylum),
+                             1, 0))%>%
+  summarize(hosts_missing_tax_lcdb = sum(tax_miss))
+```
+
+```{r}
+hosts_per_stage <- left_join(hosts_per_stage, miss_tax)
+```
+
+First calculate tax dissim using all records.
+
+```{r}
+# remove hosts missing taxonomic info
+phy.hs <- select(lcdb, Parasite.species, best_host_name, Host.no, Def.int,
+                 host_genus, host_family, host_order, host_class, host_phylum)%>%
+  filter(!is.na(host_genus) , !is.na(host_family) , !is.na(host_order) , !is.na(host_class) , !is.na(host_phylum))
+# phy.hs%>%filter(Missing.info == 1)
+```
+
+```{r, message=FALSE, warning=FALSE}
+source("../calculate_specificity_index/host_specificity_index_calculation_functions.R")
+```
+
+```{r, message=FALSE, warning=FALSE}
+spst <- select(phy.hs, Parasite.species, Host.no, Def.int)%>%distinct() # unique parasite spp after removing hosts with missing tax data
+spst$hsi_lcdb <- NA # numeric to collect calculated host specificity index
+spst$var.hsi_lcdb <- NA # numeric to collect calculated variation in host specificity index
+
+for(i in seq_along(spst$Parasite.species)){
+  mv <- spst[i,]
+  ds <- filter(phy.hs, Parasite.species == mv$Parasite.species &
+                 Host.no == mv$Host.no &
+                 Def.int == mv$Def.int)
+  hs.out <- with(ds, hs.index(best_host_name, host_genus, host_family, host_order, host_class, host_phylum)) # calc host spec index
+  spst$hsi_lcdb[i] <- hs.out[1]
+  spst$var.hsi_lcdb[i] <- hs.out[2]
+  rm(mv, ds, hs.out, i)
+}
+# two notes: host spec values include atypical species and they were calculated omitting hosts without full tax info
+```
+
+```{r}
+hosts_per_stage <- left_join(hosts_per_stage, select(spst, -Def.int))
+```
+
+```{r}
+hosts_per_stage$hsi_lcdb[which(hosts_per_stage$num_hosts_lcdb == 1)] <- 1 # any case where just one host recorded, set tax diss index as 1
+```
+
+Now recalculate it excluding suspicious host records.
+
+```{r}
+# remove hosts missing taxonomic info
+phy.hs <- select(lcdb, Parasite.species, best_host_name, Host.no, Def.int,
+                 host_genus, host_family, host_order, host_class, host_phylum, Missing.info)%>%
+  filter(!is.na(host_genus) , !is.na(host_family) , !is.na(host_order) , !is.na(host_class) , !is.na(host_phylum), Missing.info == 0)
+```
+
+```{r, message=FALSE, warning=FALSE}
+spst <- select(phy.hs, Parasite.species, Host.no, Def.int)%>%distinct() # unique parasite spp after removing hosts with missing tax data
+spst$hsi_lcdb_suspcious_rem <- NA # numeric to collect calculated host specificity index
+spst$var.hsi_lcdb_suspcious_rem <- NA # numeric to collect calculated variation in host specificity index
+
+for(i in seq_along(spst$Parasite.species)){
+  mv <- spst[i,]
+  ds <- filter(phy.hs, Parasite.species == mv$Parasite.species &
+                 Host.no == mv$Host.no &
+                 Def.int == mv$Def.int)
+  hs.out <- with(ds, hs.index(best_host_name, host_genus, host_family, host_order, host_class, host_phylum)) # calc host spec index
+  spst$hsi_lcdb_suspcious_rem[i] <- hs.out[1]
+  spst$var.hsi_lcdb_suspcious_rem[i] <- hs.out[2]
+  rm(mv, ds, hs.out, i)
+}
+# two notes: host spec values include atypical species and they were calculated omitting hosts without full tax info
+```
+
+```{r}
+hosts_per_stage <- left_join(hosts_per_stage, select(spst, -Def.int))
+```
+
+```{r}
+hosts_per_stage$hsi_lcdb_suspcious_rem[which(hosts_per_stage$num_hosts_suspicious_removed == 1)] <- 1 # any case where just one host recorded, set tax diss index as 1
+```
+```{r}
+rm(phy.hs, spst, num_hosts2, miss_tax)
+```
+
+
+
+# Life history traits 
+
+
+```{r, message=FALSE, warning=FALSE}
+lcdb_lh <- read.csv(file="../../data/CLC_database_lifehistory.csv", header = TRUE, sep=",")
+```
+
+Convert length and width measurements into estimates of biomass.
+
+```{r, message=FALSE, warning=FALSE}
+lcdb_lh <- mutate(lcdb_lh, biovolume = 
+                  if_else(Shape %in% c("cylinder", "thread-like", "whip"), 
+                          pi * (Width/2)^2 * Length, # calculate volume as a cylinder
+                          if_else(Shape %in% c("coiled", "sphere", "ellipsoid"),
+                                  4/3 * pi * Length/2 * Width/4, # calculate volume as a ellipsoid
+                                  Length * Width # calculate volume as area for remaining ribbon, leaf shapes
+                                  )),
+                biovolume = biovolume * 1.1) # covert to biomass with assumed 1.1. g/cm3 tissue density 
+```
+```{r}
+lcdb_lh <- mutate(lcdb_lh, degree.days = Development.time*(Temp - 5)) # degree days calc
+```
+
+For each parasite species, we want to calculate how much growth occurs in each stage. But before doing that, we should eliminate a few troublesome values (species with asexual reproduction as larvae and adult male measurements).
+
+```{r, message=FALSE, warning=FALSE}
+asex <- filter(lcdb_lh, !is.na(Asexual))%>%select(Parasite.species, Host.no, Stage, Asexual)%>%distinct()
+```
+
+```{r, message=FALSE, warning=FALSE}
+lcdb_lh <- filter(lcdb_lh, !(Stage == 'adult' & Sex == 'm')|is.na(Sex) ) # remove adult males
+```
+
+Life starts as a propagule, and there are multiple propagule size measurements for a given species. If the egg hatches, we want to take the free larva stage. If it does not hatch, we would like the embryo stage (this is what hatches from the egg and better represents initial size at growth). However, embryo sizes were not always reported, so in those case where embryo size was absent, we took egg size. This assumes that the size difference between embryo and egg is rather small, especially relative to the amount of growth conducted in the first host.
+
+```{r, message=FALSE, warning=FALSE}
+# id species that hatch or not
+eggos <- filter(lcdb_lh, Host.no == 0)%>%
+  select(Parasite.species, Egg.hatch)%>%
+  mutate(propagule_selector = if_else(Egg.hatch != "eaten", "free larva", "egg"))%>%
+  select(-Egg.hatch)%>%
+  na.omit%>%distinct()
+
+# determine whether there is a size measurement for embryo or egg stages
+eggos2 <- filter(lcdb_lh, Host.no == 0)%>%
+  select(Parasite.species, Stage, biovolume)%>%
+  group_by(Parasite.species, Stage)%>%
+  summarize(x = sum(!is.na(biovolume)))
+
+# combine and spread these two tables
+eggos2 <- left_join(eggos, eggos2)
+eggos2 <- spread(na.omit(eggos2), Stage, x)
+
+# identify the stage where growth starts for each species
+eggos2 <- mutate(eggos2, propagule_selector = if_else(propagule_selector == 'free larva', 'free larva',
+                                                       if_else(embryo > 0, 'embryo', 'egg')))
+
+# add selector variable to main life history table
+eggos2 <- select(eggos2, Parasite.species, propagule_selector)
+lcdb_lh <- left_join(lcdb_lh, eggos2)
+rm(eggos, eggos2)
+```
+
+Remove propagule measurements that do not best reflect the initial growth size.
+
+```{r, message=FALSE, warning=FALSE}
+lcdb_lh <- filter(lcdb_lh, !(Host.no == 0 & Stage != propagule_selector))
+```
+
+Average at level of species stage.
+
+```{r, message=FALSE, warning=FALSE}
+lcdb_lh.sp <- group_by(lcdb_lh, Parasite.species, Host.no, Stage)%>%
+  summarize(avg_length = mean(Length, na.rm=T), biovolume = mean(biovolume, na.rm=T), avg_dt = mean(Development.time, na.rm = T), avg_dd = mean(degree.days, na.rm = T))
+# if can't calculate, replace NaN with NA
+lcdb_lh.sp$avg_length[is.nan(lcdb_lh.sp$avg_length)] <- NA
+lcdb_lh.sp$biovolume[is.nan(lcdb_lh.sp$biovolume)] <- NA
+lcdb_lh.sp$avg_dt[is.nan(lcdb_lh.sp$avg_dt)] <- NA
+lcdb_lh.sp$avg_dd[is.nan(lcdb_lh.sp$avg_dd)] <- NA
+```
+
+```{r}
+hosts_per_stage <- left_join(hosts_per_stage, select(lcdb_lh.sp, Parasite.species, Host.no, Stage, stage_body_length = avg_length, stage_biov = biovolume, avg_dt, avg_dd))
+```
+
+Then we calculate absolute and relative body size differences between consecutive life stages, i.e. how much worms grow at a certain life stage.
+
+```{r, message=FALSE, warning=FALSE}
+growth_df <- arrange( ungroup(lcdb_lh.sp), Parasite.species, Host.no)%>% # arrange by species and host.no
+  mutate(lengthv = lag(avg_length, 1), 
+         biov = lag(biovolume, 1))%>% # make a variable representing size in previous stage
+  mutate(abs_growth_len = avg_length - lengthv, # absolute diff in lengths
+         rel_growth_len = log10(avg_length) - log10(lengthv), # relative diff in lengths
+         abs_growth_biov = biovolume - biov, # absolute diff biov
+         rel_growth_biov = log10(biovolume) - log10(biov)) # relative diff biov
+
+# remove growth values for egg stages; arise when calculating 'species B egg' - 'species A adult'
+growth_df$abs_growth_len[which(growth_df$Host.no == 0)] <- NA 
+growth_df$rel_growth_len[which(growth_df$Host.no == 0)] <- NA
+growth_df$abs_growth_biov[which(growth_df$Host.no == 0)] <- NA 
+growth_df$rel_growth_biov[which(growth_df$Host.no == 0)] <- NA
+
+# reduce data to just columns to add to main stage level table
+growth_df <- select(growth_df, Parasite.species, Host.no, Stage, abs_growth_len, rel_growth_len, abs_growth_biov, rel_growth_biov)%>%
+  filter(Host.no != 0)
+```
+
+```{r}
+growth_df <- left_join(growth_df, select(asex, -Host.no, -Stage)) # id the asexual spp
+
+# include asexual spp, for egg to 1st host only include if size measurement is clonal volume
+# for 1st to 2nd host only include if size in 1st host is individual measure
+growth_df <- filter(growth_df,
+                    is.na(Asexual) | (Asexual == 'clonal' & Stage == '1larv') | (Asexual == 'individual' & Stage == 'adult'))
+```
+
+And we combine growth and host specificity dataframes that are at the 'species stage' level.
+
+```{r}
+hosts_per_stage <- left_join(hosts_per_stage, growth_df)
+```
+
+
+```{r}
+summary(hosts_per_stage)
+```
+
+```{r}
+write.csv(hosts_per_stage, file = "../../data/stage_level_combined.csv", row.names = F)
+```
+
