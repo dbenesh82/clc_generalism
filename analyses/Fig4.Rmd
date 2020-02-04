@@ -1,0 +1,127 @@
+---
+title: "Fig 4"
+author: "Dan Benesh"
+date: "11/21/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r}
+hosts_per_stage <- read.csv(file = "../data/stage_level_combined.csv", header = TRUE)
+```
+
+```{r}
+hosts_per_stage <- mutate(hosts_per_stage, rel_growth_paratenic = if_else(Facultative == "paratenic" & is.na(rel_growth_biov), 0, rel_growth_biov),
+                          avg_dd_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dd), 20, avg_dd))
+```
+
+```{r}
+# spread host range
+hs_wide <- hosts_per_stage%>%
+  filter(Facultative != 'postcyclic')%>%
+  select(Parasite.species, Host.no, num_hosts_suspicious_removed)%>%
+  spread(key =  Host.no, value = num_hosts_suspicious_removed)
+names(hs_wide) <- c('Parasite.species', 'ns1', 'ns2', 'ns3', 'ns4', 'ns5')
+```
+```{r}
+# spread tax diss index
+hs_wide2 <- hosts_per_stage%>%
+  filter(Facultative != 'postcyclic')%>%
+  select(Parasite.species, Host.no, hsi_lcdb_suspcious_rem)%>%
+  spread(key =  Host.no, value = hsi_lcdb_suspcious_rem)
+names(hs_wide2) <- c('Parasite.species', 'hsi1', 'hsi2', 'hsi3', 'hsi4', 'hsi5')
+```
+```{r}
+hs_wide <- left_join(hs_wide, hs_wide2)
+```
+```{r}
+# stack generality, so one colum is in host n, next is in host n +1
+hs_n1 <- select(hs_wide, Parasite.species, ns1, ns2, hsi1, hsi2)%>%
+  filter(!is.na(ns1) & !is.na(ns2))
+hs_n1$step <- "1st to 2nd"
+
+hs_n2 <- select(hs_wide, Parasite.species, ns1 = ns2, ns2 = ns3, hsi1 = hsi2, hsi2 = hsi3)%>%
+  filter(!is.na(ns1) & !is.na(ns2))
+hs_n2$step <- "2nd to 3rd"
+
+hs_n3 <- select(hs_wide, Parasite.species, ns1 = ns3, ns2 = ns4, hsi1 = hsi3, hsi2 = hsi4)%>%
+  filter(!is.na(ns1) & !is.na(ns2))
+hs_n3$step <- "3rd to 4th,\n4th to 5th"
+
+hs_n4 <- select(hs_wide, Parasite.species, ns1 = ns4, ns2 = ns5, hsi1 = hsi4, hsi2 = hsi5)%>%
+  filter(!is.na(ns1) & !is.na(ns2))
+hs_n4$step <- "3rd to 4th,\n4th to 5th"
+
+hs_nlong <- bind_rows(hs_n1, hs_n2, hs_n3, hs_n4)
+```
+
+```{r}
+hs_nlong <- left_join(hs_nlong, select(hosts_per_stage, Parasite.species, lcl_max_fac, study_effort)%>%distinct())
+```
+
+# Generality in stage *n* vs stage *n+1*
+
+Here's how many pairs of stages available:
+```{r}
+length(hs_nlong$Parasite.species)
+```
+
+From this many species:
+```{r}
+n_distinct(hs_nlong$Parasite.species)
+```
+
+
+```{r}
+f3a <- ggplot(hs_nlong, aes(x = ns1, y = ns2, color = step)) + 
+  geom_point(alpha = 0.2, aes(size = study_effort)) +
+  geom_smooth(method = lm, se = F, linetype = 'dashed') +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "Number of host species, stage n", y = "Number of host species, stage n+1", 
+       color = "Life stages", size = "Pubmed hits") +
+  theme(panel.grid.minor = element_blank()) +
+  annotate(geom = 'text', label = '(a)', x = min(hs_nlong$ns1, na.rm=T), y = max(hs_nlong$ns2, na.rm=T) )
+
+f3a
+```
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+```{r}
+f3b <- ggplot(hs_nlong, aes(x = hsi1, y = hsi2, color = step)) + 
+  geom_point(alpha = 0.2, aes(size = study_effort)) +
+  geom_smooth(method = lm, se = F, linetype = 'dashed') +
+  labs(x = "Taxonomic dissimilarity, stage n", y = "Taxonomic dissimilarity, stage n+1",
+       color = "Life stages", size = "Pubmed hits") +
+  theme(panel.grid.minor = element_blank()) +
+  scale_x_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  annotate(geom = 'text', label = '(b)', x = min(hs_nlong$hsi1, na.rm=T), y = 6 ) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1)))
+
+f3b
+```
+
+```{r}
+fig_width <- 6
+fig_height <- 4.5
+
+ggsave(filename = "../figs/Fig4a.svg", plot = f3a, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig4a.png", plot = f3a, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
+
+```{r}
+ggsave(filename = "../figs/Fig4b.svg", plot = f3b, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig4b.png", plot = f3b, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
+

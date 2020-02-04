@@ -10,120 +10,111 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(ape)
-library(RColorBrewer)
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 options(stringsAsFactors = FALSE)
 theme_set(new = theme_bw())
 ```
 
-```{r}
-hosts_per_stage <- read.csv(file = "../data/stage_level_combined.csv", header = TRUE)
+I used data from several sources: (1) [life cycle database]() (for parasite life cycle lengths and host records), (2) host-parasite database from the NHM London (to acquire a more exhaustive list of host records for each parasite), (3) genbank sequences (to make a parasite phylogeny), (4) NCBI taxonomy database (to get the basic taxonomic hierarchy for every host species), and (5) PubMed (to estimate study effort on each parasite species).
+
+```{r importdata}
+lcdb <- read.csv(file = "../data/CLC_database_updated_names.csv", header = TRUE)
+dat <- read.csv(file = "../data/spp_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "parasite_phylogeny/full_tree_time_calib.nex")
+tip_names <- read.csv(file = "../data/data_tree_tips_table.csv")
 ```
 
 ```{r}
-hosts_per_stage <- mutate(hosts_per_stage, di_plot = factor(Def.int, levels = c('int', 'def')))%>%
-  mutate(di_plot = factor(di_plot, labels = c("intermediate", "definitive")))
+dat <- left_join(dat, tip_names)
+dat <- left_join(dat, select(lcdb, Parasite.species, Parasite.group)%>%distinct())
+dat <- mutate(dat, lcl_max_fac = as.character(lcl_max))%>%
+  mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
 ```
 
-# Host range
+```{r}
+# make variable to remove species with incomplete life cycle information
+incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
+  select(Parasite.species)%>%
+  distinct()
+dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "not facultative"),
+              partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
+                                           "partial", "complete"))
+```
 
 ```{r}
-f2u <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'), # post-cyclic hosts removed
-       aes(x = factor(Host.no), y = num_hosts_suspicious_removed, color = di_plot)) + 
-  geom_boxplot(outlier.color = NA, color = 'black') +
-  geom_point(alpha = 0.2, position = position_jitterdodge(jitter.width = 0.8, jitter.height = 0)) +
+# # run this block to exclude species with partial life cycles! 
+dat <- filter(dat, partial_cycle != "partial")
+tree <- keep.tip(tree, tip = dat$tree_tips)
+```
+
+```{r}
+row.names(dat) <- dat$tree_tips # set row names to same as tree tip labels
+```
+
+Number of species
+```{r}
+length(unique(dat$Parasite.species))
+```
+Number of host records
+```{r}
+sum(dat$num_hosts_lcdb_nhm)
+```
+
+```{r}
+names(dat)
+```
+
+The first figure: life cycle length vs host range.
+
+```{r}
+f1a <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+             aes(size = pubs_pubmed_spname_group)) +
   scale_y_log10() +
-  scale_color_brewer(type = "qual", palette = "Set2") +
-  labs(x = "Stage (host) in life cycle", y = "Host records") +
-  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') + 
-  theme(legend.title = element_blank(),
-        legend.position = c(1,1),
-        legend.justification = c(1,1),
-        legend.background = element_rect(color = 'black'),
-        strip.text = element_text(face = "bold"),
-        strip.background = element_rect(fill = 'grey95'),
-        panel.grid.minor = element_blank(),
+  labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits") +
+  guides(size = FALSE) +
+  theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank()) +
-  guides(color = FALSE)
-f2u
+  annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm))
+f1a
 ```
 
-# Taxonomic dissimilarity index
-
+The second figure: life cycle length vs tax dissimilarity.
 
 ```{r}
 tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
 ```
 
-The generalism of worms in second or third intermediate hosts is also clear when we split them by life cycle length. 
-
 ```{r}
-f2l <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'),
-       aes(x = factor(Host.no), y = hsi_lcdb_suspcious_rem, color = di_plot)) + 
-  geom_boxplot(outlier.color = NA, color = 'black') +
-  geom_point(alpha = 0.2, position = position_jitterdodge(jitter.width = 0.8, jitter.height = 0)) +
+f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+             aes(size = pubs_pubmed_spname_group)) +
   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
-  scale_color_brewer(type = "qual", palette = "Set2") +
-  labs(x = "Stage (host) in life cycle", y = "Taxonomic dissimilarity") +
-  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') + 
-  theme(legend.title = element_blank(),
-        legend.position = c(0.98,0.98),
-        legend.justification = c(1,1),
-        legend.direction = 'horizontal',
+  labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index", size = "Pubmed hits") +
+  theme(legend.position = c(0.98, 0.02),
+        legend.justification = c(1,0),
         legend.background = element_rect(color = 'black'),
-        legend.margin = margin(t=0.5, r=0.5, b = 0.5, l=0.5),
-        legend.key = element_rect(fill = NA),
-        strip.text = element_text(face = "bold"),
-        strip.background = element_rect(fill = 'grey95'),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank()) +
-  guides(color = guide_legend(override.aes = list(alpha = 1)))
-f2l
+  annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb))
+f1b
 ```
 
-Combine the two figures
+Export as SVG and PNG, first Fig 2a...
 
 ```{r}
-library(cowplot)
+fig_width <- 4.5
+fig_height <- 4.5
+
+ggsave(filename = "../figs/Fig2a.svg", plot = f1a, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig2a.png", plot = f1a, device = 'png', units = 'in', width = fig_width, height = fig_height)
 ```
+
+...then Fig 2b.
 
 ```{r}
-f2u2 <- f2u + 
-  theme(axis.title.x = element_blank(), 
-        axis.text.x = element_blank())
-
-f2l2 <- f2l +
-  theme(strip.background = element_blank(),
-  strip.text.x = element_blank())
+ggsave(filename = "../figs/Fig2b.svg", plot = f1b, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig2b.png", plot = f1b, device = 'png', units = 'in', width = fig_width, height = fig_height)
 ```
-
-```{r}
-ap <- align_plots(f2u2, f2l2, align="hv")
-f2c <- gridExtra::grid.arrange(ap[[1]], ap[[2]])
-```
-
-
-
-Export as SVG and PNG, first Fig 1a...
-
-```{r}
-fig_width <- 7
-fig_height <- 4
-
-# ggsave(filename = "../figs/Fig2u.svg", plot = f2u, device = 'svg', units = 'in', width = fig_width, height = fig_height)
-ggsave(filename = "../figs/Fig2u.png", plot = f2u, device = 'png', units = 'in', width = fig_width, height = fig_height)
-```
-
-...then Fig 1b.
-
-```{r}
-# ggsave(filename = "../figs/Fig2l.svg", plot = f2l, device = 'svg', units = 'in', width = fig_width, height = fig_height)
-ggsave(filename = "../figs/Fig2l.png", plot = f2l, device = 'png', units = 'in', width = fig_width, height = fig_height)
-```
-
-Edit the combined figure by bringing the upper plot down, and make the legend more evenly spaced.
-
-```{r}
-ggsave(filename = "../figs/Fig2_comb.svg", plot = f2c, device = 'svg', units = "in", width = fig_width, height = fig_height*2)
-```
-
