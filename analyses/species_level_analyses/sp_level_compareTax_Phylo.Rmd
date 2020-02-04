@@ -1,0 +1,267 @@
+---
+title: "Comparing phylogenetic and taxonomic models"
+author: "Dan Benesh"
+date: "12/23/2019"
+output: github_document
+---
+
+In species-level analyses [here](sp_level_analysis_host_range_freq.Rmd) and [here](sp_level_analysis_tax_dissim_freq.Rmd), I fit taxonomic mixed models. That is, I treat taxonomic levels as random effects. A main motivation for this is the ability to determine at what taxonomic level variation in parasite generalism is observed. However, taxonomy is an imperfect representation of the evolutionary relationships among species. The goal of this notebook is to ensure that taxonomic and phylogenetic models yield similar parameter estimates for what we're most interested in (the effect of life cycle length). For this, I turn to `MCMCglmm`. It can fit both phylogenetic and taxonomic mixed models in the same framework.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+```{r importdata}
+lcdb <- read.csv(file = "../../data/CLC_database_updated_names.csv", header = TRUE)
+dat <- read.csv(file = "../../data/spp_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "../parasite_phylogeny/full_tree_time_calib.nex")
+tip_names <- read.csv(file = "../../data/data_tree_tips_table.csv")
+```
+```{r}
+dat <- left_join(dat, tip_names)
+dat <- left_join(dat, select(lcdb, Parasite.species, Parasite.group)%>%distinct())
+dat <- mutate(dat, lcl_max_fac = as.character(lcl_max))%>%
+  mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
+```
+```{r}
+# worm taxonomy
+acanth_tax <- read.csv("../parasite_phylogeny/acanth_taxonomy.csv")
+acanth_tax <- select(acanth_tax, species, genus, family, order, class, phylum)
+
+cest_tax <- read.csv("../parasite_phylogeny/cest_taxonomy.csv")
+cest_tax <- select(cest_tax, species, genus, family, order, class, phylum)
+
+nem_tax <- read.csv("../parasite_phylogeny/nem_taxonomy_rotl.csv")
+nem_tax <- select(nem_tax, species, genus, family, order, class, phylum)
+
+worm_tax <- rbind(acanth_tax, cest_tax, nem_tax)
+```
+```{r}
+# join worm taxonomy based on genus name
+dat <- mutate(dat, parasite_genus = substr(tree_tips, start = 1, stop = regexpr("_", tree_tips)-1))
+
+dat <- left_join(dat,
+                 select(worm_tax, parasite_genus = genus, parasite_family = family, parasite_order = order, parasite_class = class, parasite_phylum = phylum)%>%distinct(),
+                 by = 'parasite_genus')
+```
+```{r}
+# make variable to remove species with incomplete life cycle information
+incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
+  select(Parasite.species)%>%
+  distinct()
+dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "not facultative"),
+              partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
+                                           "partial", "complete"))
+```
+```{r}
+# # run this block to exclude species with partial life cycles! 
+dat <- filter(dat, partial_cycle != "partial")
+tree <- keep.tip(tree, tip = dat$tree_tips)
+```
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+```{r}
+# center log-transformed study effort
+dat <- mutate(dat, zstudy_effort = 
+                log10(pubs_pubmed_spname_group+1) - mean( log10(pubs_pubmed_spname_group+1), na.rm=T))
+dat$obs <- factor(1:length(dat$Parasite.species)) # observation level effect for quantifying overdispersion
+```
+
+# Comparing phylogenetic and taxonomic mixed models with MCMCglmm
+
+```{r}
+library(MCMCglmm)
+```
+
+I'm not interested in testing a series of models. Rather, I'm interested in comparing parameter estimates for the best model that uses either taxonomy or phylogeny as random effects. That best model was the one with life cycle length as a factor.
+
+## Host range
+
+We'll start by fitting the taxonomic model.
+
+### Taxonomic mixed model
+
+```{r}
+# parameter expanded priors
+priorT <- list(R = list(V = diag(1), nu = 0.002),
+               G = list(G1 = list(V = diag(1), nu = 1, alpha.mu = 0, alpha.V = 1000),
+                        G1 = list(V = diag(1), nu = 1, alpha.mu = 0, alpha.V = 1000),
+                        G1 = list(V = diag(1), nu = 1, alpha.mu = 0, alpha.V = 1000),
+                        G1 = list(V = diag(1), nu = 1, alpha.mu = 0, alpha.V = 1000),
+                        G1 = list(V = diag(1), nu = 1, alpha.mu = 0, alpha.V = 1000)))
+priorP <- list(R = list(V = diag(1), nu = 0.002),
+               G = list(G1 = list(V = diag(1), nu = 1, alpha.mu = 0, alpha.V = 1000)))
+```
+
+```{r}
+tax_mod <- MCMCglmm(num_hosts_lcdb_nhm ~ zstudy_effort + lcl_max_fac, 
+                    random = ~ parasite_genus + parasite_family + 
+                      parasite_order + parasite_class + parasite_phylum, # tax random effx
+                    data = dat, 
+                    prior = priorT,
+                    nitt=103000, thin = 100,
+                    family = "poisson", pr=F)
+```
+
+The chains for the random effects do not mix very well, which is not surprising because the taxonomic terms are nested - if one explains more variance, the other explains less. The fixed parameters (our interest) mix well.
+
+```{r}
+plot(tax_mod$VCV)
+summary(tax_mod)
+```
+
+
+## Phylogenetic mixed model
+
+Now we'll fit the same model, but have the phylogeny as our random effect.
+
+```{r}
+final.tree2<-makeNodeLabel(tree) # standardize node labels
+Ainv <- inverseA(final.tree2)$Ainv # make inv of phy cov matrix
+```
+
+```{r}
+phy_mod <- MCMCglmm(num_hosts_lcdb_nhm ~ zstudy_effort + lcl_max_fac, 
+                    random = ~tree_tips,
+                    data = dat, 
+                    prior = priorP,
+                    nitt=103000, thin = 100,
+                    ginverse=list(tree_tips=Ainv),
+                    family = "poisson", pr=F)
+```
+
+The phylogenetic effect mixes ok, though it could be run longer, and the fixed effects look ok.
+
+```{r}
+plot(phy_mod$VCV)
+summary(phy_mod)
+```
+
+Now let's compare the parameter estimates from these models. They are very similar, both in their value and their uncertainty, indicating that the taxonomic and phylogenetic models returned very similar results.
+
+```{r}
+tfix <- data.frame(summary(tax_mod)$solutions[,1:5])
+tfix <- rename_all(tfix, function(x) {paste0("tax_", x)})
+tfix$param <- row.names(tfix)
+pfix <- data.frame(summary(phy_mod)$solutions[,1:5])
+pfix <- rename_all(pfix, function(x) {paste0("phy_", x)})
+
+df_comp <- cbind(tfix, pfix)
+```
+```{r}
+ggplot(df_comp, aes(x = tax_post.mean, y = phy_post.mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = phy_l.95..CI, ymax = phy_u.95..CI)) +
+  geom_errorbarh(aes(xmin = tax_l.95..CI, xmax = tax_u.95..CI)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "Taxonomic model", y = "Phylogenetic model", title = "Parameters estimates +- 95% CI") +
+  # scale_x_continuous(limits = c(0,1.1)) + scale_y_continuous(limits = c(0,1.1)) 
+  geom_label(aes(label = param), nudge_x = 0.1, nudge_y = -0.1, alpha = 0.2)
+```
+
+Given the similar fixed effect values, we would expect the variance explained by taxonomy and phylogeny to be similar. Here is the chain for the phylogenetic heritability, i.e. the variance explained by the tree as a portion of the total variance. It is clearly positive (>0).
+
+```{r}
+phy_h2 <- phy_mod$VCV[,'tree_tips']/(phy_mod$VCV[,'tree_tips'] + phy_mod$VCV[,'units'])
+plot(phy_h2)
+summary(phy_h2)
+```
+
+Now we look at the same metric from the taxonomic model. It is a little lower, maybe closer to 0.2. Nonetheless, their closeness is reassuring, as it indicates the information content in parasite taxonomy and phylogeny is similar with regards to host range.
+
+```{r}
+tax_vcv <- rowSums(tax_mod$VCV[,1:5])
+tax_h2 <- tax_vcv/(tax_vcv + tax_mod$VCV[,'units'])
+plot(tax_h2)
+summary(tax_h2)
+```
+
+
+## Host taxonomic dissimilarity
+
+Now we'll conduct the same exercise with our second generalism metric, taxonomic dissimilarity.
+
+### Taxonomic mixed model
+
+```{r}
+tax_mod2 <- MCMCglmm(hsi_comb ~ zstudy_effort + lcl_max_fac,
+                    random = ~parasite_genus + parasite_family +
+                      parasite_order + parasite_class + parasite_phylum, # tax random effx
+                    data = dat, 
+                    prior = priorT,
+                    nitt=103000, thin = 100,
+                    family = "gaussian", pr=F)
+```
+
+```{r}
+plot(tax_mod2$VCV)
+summary(tax_mod2)
+```
+
+## Phylogenetic mixed model
+
+```{r}
+phy_mod2 <- MCMCglmm(hsi_comb ~ zstudy_effort + lcl_max_fac,
+                    random = ~tree_tips,
+                    data = dat, 
+                    prior = priorP,
+                    nitt=103000, thin = 30,
+                    ginverse=list(tree_tips=Ainv),
+                    family = "gaussian", pr=F)
+```
+
+Chain mixing diagnositics looked similar to 'host range' above, i.e. taxonomic groups mix poorly, tree mixes ok, and the fixed effects mix well. 
+
+```{r}
+plot(phy_mod2$VCV)
+summary(phy_mod2)
+```
+
+Again let's compare the parameter estimates. They are very similar, both in their value and their uncertainty, indicating that the taxonomic and phylogenetic models returned very similar results.
+
+```{r}
+tfix <- data.frame(summary(tax_mod2)$solutions[,1:5])
+tfix <- rename_all(tfix, function(x) {paste0("tax_", x)})
+tfix$param <- row.names(tfix)
+pfix <- data.frame(summary(phy_mod2)$solutions[,1:5])
+pfix <- rename_all(pfix, function(x) {paste0("phy_", x)})
+
+df_comp <- cbind(tfix, pfix)
+```
+```{r}
+ggplot(df_comp, aes(x = tax_post.mean, y = phy_post.mean)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = phy_l.95..CI, ymax = phy_u.95..CI)) +
+  geom_errorbarh(aes(xmin = tax_l.95..CI, xmax = tax_u.95..CI)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2) +
+  labs(x = "Taxonomic model", y = "Phylogenetic model", title = "Parameters estimates +- 95% CI") +
+  # scale_x_continuous(limits = c(0,1.1)) + scale_y_continuous(limits = c(0,1.1)) 
+  geom_label(aes(label = param), nudge_x = 0.3, nudge_y = -0.1, alpha = 0.2)
+```
+
+Given the similar fixed effect values, we would expect the variance explained by taxonomy and phylogeny to be similar. Here is the chain for the phylogenetic heritability, i.e. the variance explained by the tree as a portion of the total variance. It is not obviously different from zero.
+
+```{r}
+phy_h2 <- phy_mod2$VCV[,'tree_tips']/(phy_mod2$VCV[,'tree_tips'] + phy_mod2$VCV[,'units'])
+plot(phy_h2)
+summary(phy_h2)
+```
+
+Now we look at the same metric from the taxonomic model. It is higher, close to 0.2. I'm not sure why parasite taxonomy explains variation in this metric that the tree does not. My guess is it has to do with branch lengths (there are some short ones in the tree). The main thing is that they return similar fixed effect parameter estimates, which is what I wanted to ensure.
+
+```{r}
+tax_vcv <- rowSums(tax_mod2$VCV[,1:5])
+tax_h2 <- tax_vcv/(tax_vcv + tax_mod2$VCV[,'units'])
+plot(tax_h2)
+summary(tax_h2)
+```
+
+# Conclusions
+
+Phylogenetic and taxonomic models return similar results for the fixed effect of life cycle length. However, they may differ in how much variation they explain in our second generalism metric, taxonomic dissimilarity.

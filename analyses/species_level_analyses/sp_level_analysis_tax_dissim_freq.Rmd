@@ -1,0 +1,648 @@
+---
+title: "Species-level regression for taxonomic dissimilarity"
+author: "Dan Benesh"
+date: "02/04/2020"
+output: github_document
+---
+
+# Background
+
+One constraint on the evolution of complex life cycles is that parasites need to infect diverse hosts with different physiologies and immune systems. In other words, it is presumed to be costly to be a generalist. However, whether complex life cycle parasites actually infect a wider range of hosts has never been tested. The goal of this script is to test whether longer life cycles (i.e. more successive hosts before reproduction) are associated with a wider host range.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+I used data from several sources: (1) [life cycle database](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecy.1680) (for parasite life cycle lengths and host records), (2) host-parasite database from the NHM London (to acquire a more exhaustive list of host records for each parasite), (3) genbank sequences (to make a parasite phylogeny), (4) NCBI taxonomy database (to get the basic taxonomic hierarchy for every host species), and (5) PubMed (to estimate study effort on each parasite species).
+
+```{r importdata}
+lcdb <- read.csv(file = "../../data/CLC_database_updated_names.csv", header = TRUE)
+dat <- read.csv(file = "../../data/spp_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "../parasite_phylogeny/full_tree_time_calib.nex")
+tip_names <- read.csv(file = "../../data/data_tree_tips_table.csv")
+```
+
+```{r}
+dat <- left_join(dat, tip_names)
+dat <- left_join(dat, select(lcdb, Parasite.species, Parasite.group)%>%distinct())
+dat <- mutate(dat, lcl_max_fac = as.character(lcl_max))%>%
+  mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
+```
+```{r}
+# worm taxonomy
+acanth_tax <- read.csv("../parasite_phylogeny/acanth_taxonomy.csv")
+acanth_tax <- select(acanth_tax, species, genus, family, order, class, phylum)
+
+cest_tax <- read.csv("../parasite_phylogeny/cest_taxonomy.csv")
+cest_tax <- select(cest_tax, species, genus, family, order, class, phylum)
+
+nem_tax <- read.csv("../parasite_phylogeny/nem_taxonomy_rotl.csv")
+nem_tax <- select(nem_tax, species, genus, family, order, class, phylum)
+
+worm_tax <- rbind(acanth_tax, cest_tax, nem_tax)
+```
+```{r}
+# join worm taxonomy based on genus name
+dat <- mutate(dat, parasite_genus = substr(tree_tips, start = 1, stop = regexpr("_", tree_tips)-1))
+
+dat <- left_join(dat,
+                 select(worm_tax, parasite_genus = genus, parasite_family = family, parasite_order = order, parasite_class = class, parasite_phylum = phylum)%>%distinct(),
+                 by = 'parasite_genus')
+```
+```{r}
+# make variable to remove species with incomplete life cycle information
+incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
+  select(Parasite.species)%>%
+  distinct()
+dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "not facultative"),
+              partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
+                                           "partial", "complete"))
+```
+```{r}
+# # run this block to exclude species with partial life cycles! 
+dat <- filter(dat, partial_cycle != "partial")
+tree <- keep.tip(tree, tip = dat$tree_tips)
+```
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+```{r}
+# center log-transformed study effort
+dat <- mutate(dat, zstudy_effort = 
+                log10(pubs_pubmed_spname_group+1) - mean( log10(pubs_pubmed_spname_group+1), na.rm=T))
+dat$obs <- factor(1:length(dat$Parasite.species)) # observation level effect for quantifying overdispersion
+```
+
+# Taxonomic regressions
+
+Exploratory analyses were conducted [elsewhere](sp_level_exploratory.Rmd), and we'll test the significance of the patterns observed with a series of mixed models. For both measures of host specificity, I fit and compare models of increasing complexity: (0) intercept-only, (1) allow taxonomically correlated errors, (2) add study effort, (3) add life cycle length (max), and (4) add life cycle length (min). In step 3, adding life cycle length, I added the term as either a continuous predictor or as a factor. By adding it as a factor, I am looking for evidence of non-linearity, e.g. the difference between one- and two-host cycle parasites is not the same as the difference between two- and three-host cycle parasites.
+
+I used parasite taxonomy instead of phylogeny in the model because (1) it is faster, (2) it is easier to explore where signal comes from (i.e. which taxon instead of which tree node), and (3) describing how the phylogeny was produced takes a lot of space in the manuscript. Later I show that models with phylogeny vs taxonomy as essentially the same.
+
+## Model structure
+
+In this notebook, I examine the taxonomic dissimilarity metric of generalism. Before fitting the series of models to test hypotheses, I would like to see how well the model structure captures patterns in taxonomic dissimilarity. This metric is continuous between 1 (parasite typically infects different species within genera) and 6 (parasite infects different host phyla). However, there are a couple peaks at the 'edges' of the distribution.
+
+```{r}
+qplot(dat$hsi_comb) + labs(x = "Tax dissim")
+```
+
+These peaks are mainly due to sampling biases. For example, a parasite species is given a value of 6 if it has been recorded from just 2 hosts from different phyla. To some degree, the study effort variable should capture this variation. However, these peaks are offset from the overall mean, so they may be difficult for a standard linear mixed model to capture. I'm not sure what other model might capture this variation, like zero-inflation (doesn't account for both peaks) or censoring (the variable is not censored, it has a fixed range by definition).
+
+One possible solution is to exclude species with few recorded hosts, which is probably due to sampling effort more than host specificity. We can see this when we separate species that have 2 or more recorded hosts or not. Those with few recorded hosts are particularly likely to be in the extreme peaks, which is just a consequence of how the index is calculated.
+
+```{r}
+ggplot(dat, aes(x = hsi_comb, fill = num_hosts_lcdb_nhm <= 2)) +
+  geom_histogram() +
+  labs(fill = "2 or fewer hosts?", x = "Tax dissim")
+```
+
+There is a slight left skew in the data. This is somewhat improved by square transformation.
+
+```{r}
+ggplot(dat, aes(x = hsi_comb^2, fill = num_hosts_lcdb_nhm <= 2)) +
+  geom_histogram() +
+  labs(fill = "2 or fewer hosts?", x = "Tax dissim")
+```
+
+Thus, let's compare three standard mixed models, one with the full data, one excluding parasite species with few host species, and one with a square transformation. The models include taxonomy, study effort, and life cycle length.
+
+```{r}
+library(lme4)
+```
+
+```{r}
+reg1x <- lmer(hsi_comb ~ zstudy_effort + lcl_max_fac + 
+                (1|parasite_genus) + (1|parasite_family) +
+                (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+            data = dat,
+            REML=T)
+reg2x <- lmer(hsi_comb ~ zstudy_effort + lcl_max_fac + 
+                (1|parasite_genus) + (1|parasite_family) +
+                (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+            data = filter(dat, num_hosts_lcdb_nhm > 2),
+            REML=T)
+reg3x <- lmer(hsi_comb^2 ~ zstudy_effort + lcl_max_fac + 
+                (1|parasite_genus) + (1|parasite_family) +
+                (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+            data = filter(dat, num_hosts_lcdb_nhm > 2),
+            REML=T)
+```
+```{r}
+summary(reg1x)
+```
+
+```{r}
+tx <- reg1x@frame
+tx2 <- reg2x@frame
+tx3 <- reg3x@frame
+tx$preds <- predict(reg1x)
+tx2$preds <- predict(reg2x)
+tx3$preds <- sqrt(predict(reg3x))
+# tx3$preds <- '^'(predict(reg3x), 1/3) # for cube root trans
+tx <- rename(tx, generalism = hsi_comb)
+tx2 <- rename(tx2, generalism = hsi_comb)
+tx3 <- mutate(tx3, generalism = sqrt(`hsi_comb^2`))
+# tx3 <- mutate(tx3, generalism = '^'(`hsi_comb^3`, 1/3))
+tx$model <- 'LMM, full'
+tx2$model <- 'LMM, subset'
+tx3$model <- 'LMM, subset, square'
+
+tx <- bind_rows(tx, tx2, tx3)
+rm(tx2, tx3)
+```
+
+Here is a plot with the predicted values on the y and the observed values on the x. The dashed line is the 1:1 line (i.e. model predicts data perfectly). We can see that all models over- and under-estimate extreme values.
+
+```{r}
+ggplot(tx, aes(y = preds, x = generalism, color = model)) +
+  geom_point(aes(), alpha = 0.1) +
+  geom_abline(intercept = 0, slope = 1, linetype = 'dashed', size = 1.5) +
+  geom_smooth(se = F) +
+  labs(x = "Observed", y = "Predicted")
+```
+
+Next, let's look at the unstandardized residual plots. They all look quite similar. It is not too bad, though the model weaknesses are still apparent (over- and under-estimating particular values).
+
+```{r}
+ggplot(tx, aes(y = generalism - preds, x = preds, color = model)) +
+  geom_point(aes(), alpha = 0.1) +
+  geom_abline(intercept = 0, slope = 0) + 
+  geom_smooth(se = F, linetype = 'solid', size = 2) +
+  facet_wrap(~model) +
+  labs(x = "Fitted values", y = "Unstandardized Residuals")
+```
+
+```{r}
+tx_preds <- select(tx, lcl_max_fac, hosts = preds, model)
+tx_obs <- filter(tx, model == "LMM, full")%>%
+  select(lcl_max_fac, hosts = generalism, model)
+tx_obs$model <- "observed"
+
+txx <- bind_rows(tx_preds, tx_obs)
+```
+
+Another way to check model fit is to compare the distribution of predictions with that of the observations. Here are density plots for the predicted values. We can see that all model formulations yield similar predicted distributions, suggesting transformations and removing data do not have large effects. All predicted distributions are narrower than the observed distribution.
+
+```{r}
+ggplot(txx, aes(x = hosts, fill = model)) +
+  geom_density() +
+  facet_wrap(~model, ncol = 1) 
+```
+
+The pattern is perhaps better visualized without panelling. All models appear similar.
+
+```{r}
+ggplot(filter(txx, model == 'observed'),
+       aes(x = hosts)) +
+  geom_density(color = 'black', size = 2) +
+  geom_density(data = filter(txx, model != 'observed'), 
+               aes(color = model), size = 1) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Tax dissim index")
+```
+
+The main trend of interest is the increase in host range with life cycle length. Let's see what the models predict for this relationship, compared to the observed pattern. They are all quite similar.
+
+```{r}
+nd <- select(tx, lcl_max_fac)%>%arrange(lcl_max_fac)%>%distinct()
+nd$zstudy_effort <- 0
+
+txy <- data.frame(LMM = predict(reg1x, newdata = nd, re.form = NA),
+                  LMM2 = predict(reg2x, newdata = nd, re.form = NA),
+                  LMM3 = sqrt(predict(reg3x, newdata = nd, re.form = NA)),
+                  lcl_max_fac = nd$lcl_max_fac, lcl = 1:4)
+txy <- txy%>%gather(key = "model", value = "predicted", LMM:LMM3)
+```
+```{r}
+ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), 
+             aes(size = pubs_pubmed_spname_group)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits") +
+  geom_line(data = filter(txy, grepl('LMM', model)), 
+            aes(color = model, x = lcl, y = predicted), 
+            alpha = 1, size = 1.5) +
+  scale_color_discrete(labels = c("Full", "Subset", "Subset, square")) +
+  guides(size = FALSE) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank())
+```
+
+However, when we make boxplots of the predicteds instead of just the means, we see that the full model yields more variable predictions, which is what we would expect given the inclusion of extreme values.
+
+```{r}
+ggplot(txx, aes(y = hosts, x = lcl_max_fac, fill = model)) +
+  geom_boxplot(outlier.colour = NA) +
+  geom_point(alpha = 0.1, position = position_jitterdodge(jitter.height = 0, jitter.width = 0.05), shape = 21)
+```
+
+As a final model check, let's look at the distribution of random effects. Random effects are assumed to be normally distributed. We'll plot the estimated random effects for parasite family and genus, because the model summarys suggested they had the largest effect on host range.
+
+```{r}
+re1 <- as.data.frame(ranef(reg1x))
+re2 <- as.data.frame(ranef(reg2x))
+re3 <- as.data.frame(ranef(reg3x))
+
+re <- bind_rows(re1, re2, re3)
+re$model <- c(rep("full", times = length(re1$grpvar)), 
+              rep("subset", times = length(re2$grpvar)),
+              rep("sqaure", times = length(re3$grpvar)))
+rm(re1, re2, re3)
+```
+
+Here is a density plot for the distribution of random effects at the family level...
+
+```{r}
+ggplot(filter(re, grpvar == 'parasite_family'),
+       aes(x = condval)) + 
+  geom_density(aes(color = model), size = 1) +
+  facet_wrap(~model, scales = 'free') +
+  labs(title = "Random effects - family level", x = "posterior means")
+```
+
+...and here is the density plot for the random genus effects. In both cases the patterns are pretty similar.
+
+```{r}
+ggplot(filter(re, grpvar == 'parasite_genus'),
+       aes(x = condval)) + 
+  geom_density(aes(color = model), size = 1) +
+   facet_wrap(~model, scales = 'free') +
+  labs(title = "Random effects - genus level", x = "posterior means") 
+  # coord_cartesian(xlim = c(-2.5,2.5))
+```
+
+Overall, the three tested model types are similar. Therefore, I would opt for the most inclusive (no data subsetting) without transformations.
+
+## Hypothesis testing
+
+As a reminder, I fit the following models: (0) intercept-only, with observation-level random effect for residuals, (1) allow taxonomically correlated errors, (2) add study effort, (3) add life cycle length (max), and (4) add life cycle length (min). In step 3, adding life cycle length, I added the term as either a continuous predictor or as a factor.
+
+```{r}
+reg1 <- lmer(hsi_comb ~ 1 + (1|parasite_genus) + (1|parasite_family) + 
+               (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum), # taxonomic base model
+            data = dat,
+            REML=T)
+reg2 <- update(reg1, . ~ . + log10(pubs_pubmed_spname_group+1)) # add study effort
+reg3 <- update(reg2, . ~ . + lcl_max) # add max life cycle length as covariate
+reg3.1 <- update(reg2, . ~ . + lcl_max_fac) # add max life cycle length as covariate
+reg4 <- update(reg3.1, . ~ . + lcl_min) # add min life cycle length
+```
+```{r}
+anova(reg1, reg2, reg3, reg3.1, reg4)
+```
+
+These models are nested, so we can compare them with likelihood ratio tests (table above). Adding study effort is not an improvement, but adding life cycle length, particularly as a factor, is a major improvement. Splitting out the facultative species was not an improvement. The best model as judged by AIC is the one treating life cycle length as a categorical variable.
+
+```{r}
+# anova(reg3, reg3.1)
+# anova(reg3.1, reg4)
+```
+
+Here's the summary of the "best" model
+
+```{r}
+summary(reg3.1)
+```
+
+Now let's look explicitly at effect sizes by making an R^2^ table.
+
+```{r}
+r2_lmm_tax <- function(model) {
+  # marginal r2 is just fixed effects
+  # condition r2 is fixed and rand effects combined
+  
+  # model call
+  call <- as.character(model@call)[2]
+
+  # parameter estimates and df
+  fixed_param <- fixef(model)
+  df <- length(fixed_param) - 1
+
+  # variance due to fixed effects
+  pred <- as.vector(model.matrix(model) %*% fixed_param) # predicteds on basis of just fixed effects
+  varF <- var(pred)
+
+  # variance due to rand effects
+  vc <- as.data.frame(VarCorr(model))
+  varE <- filter(vc, grp == "Residual")$vcov # residual var
+  vc <- filter(vc, grp != "Residual")
+  varR <- sum(vc$vcov) # random effect var
+
+  # marginal r2
+  mr2 <- varF/(varF + varR + varE)
+
+  # conditional r2
+  cr2 <- (varF + varR)/(varF + varR + varE)
+
+  # output
+  out_frame <- data_frame(call = call, df = df, marg_r2 = round(mr2, 3), cond_r2 = round(cr2,3))
+  return(out_frame)
+}
+```
+```{r}
+mod_list <- list(reg1, reg2, reg3, reg3.1, reg4)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("taxonomy", "study effort", 
+                   "life cycle length", "life cycle length, factor", "facultative life cycle")
+r2_table <- dplyr::select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_table
+```
+
+The most important factor is life cycle length - as a factor it explains 38% of the variation. Even after accounting for this, there is still an appreciable amount of taxonomic variation, about 16%. Hopefully, this taxonomic variation does not reflect certain taxa having extreme values. 
+
+Let's check that. We re-fit the models excluding poorly studied parasites (< 3 recorded hosts) and then reproduce the R^2^ table.
+
+```{r}
+reg1t <- lmer(hsi_comb ~ 1 + (1|parasite_genus) + (1|parasite_family) + 
+               (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum), # taxonomic base model
+            data = filter(dat, num_hosts_lcdb_nhm > 2),
+            REML=T)
+reg2t <- update(reg1t, . ~ . + log10(pubs_pubmed_spname_group+1)) # add study effort
+reg3t <- update(reg2t, . ~ . + lcl_max) # add max life cycle length as covariate
+reg3.1t <- update(reg2t, . ~ . + lcl_max_fac) # add max life cycle length as covariate
+reg4t <- update(reg3.1t, . ~ . + lcl_min) # add min life cycle length
+```
+```{r}
+mod_list <- list(reg1t, reg2t, reg3t, reg3.1t, reg4t)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("taxonomy", "study effort", 
+                   "life cycle length", "life cycle length, factor", "facultative life cycle")
+r2_table <- dplyr::select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_table
+```
+
+The taxonomic effect decreases, but not much. Thus, we can be confident that there is real variation among parasite taxa in this generalism metric. Let's explore that further. At what level does this variation arise? Mainly between parasite genera.
+
+```{r}
+# parameter estimates and df
+fixed_param <- fixef(reg3.1)
+df <- length(fixed_param) - 1
+
+# variance due to fixed effects
+pred <- as.vector(model.matrix(reg3.1) %*% fixed_param) # predicteds on basis of just fixed effects
+varF <- var(pred)
+
+
+# variance due to rand effects
+vc <- as.data.frame(VarCorr(reg3.1))
+varE <- filter(vc, grp == "Residual")$vcov # residual var
+vc <- filter(vc, grp != "Residual")
+varR <- sum(vc$vcov) # random effect var
+
+vc$fixed <- varF
+vc$resid <- varE
+vc$rand <- varR
+
+vc <- mutate(vc, prop_explained = vcov/(fixed + resid + rand))
+vc$tax_level <- factor(tax.ranks, levels = tax.ranks)
+ggplot(vc, aes(x = tax_level, y = prop_explained)) +
+  geom_point() +
+  labs(x = "Parasite taxonomic level", y = "Proportion variance explained")
+```
+
+Another way to check this is by adding taxonomic levels sequentially, either forwards or backwards and seeing how the variance explained changed. First, we go from tips to root, starting with genus and adding additional levels. Relatively little additional variation is explained beyond genus. 
+
+```{r}
+# forwards taxa
+reg1 <- lmer(hsi_comb ~ log10(pubs_pubmed_spname_group+1) + lcl_max_fac + (1|parasite_genus),
+            data = dat,
+            REML=T)
+reg2 <- update(reg1, . ~ . + (1|parasite_family))
+reg3 <- update(reg2, . ~ . + (1|parasite_order))
+reg4 <- update(reg3, . ~ . + (1|parasite_class))
+reg5 <- update(reg4, . ~ . + (1|parasite_phylum))
+# anova(reg1, reg2, reg3, reg4, reg5)
+
+mod_list <- list(reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+r2_tablex <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_tablex$step <- c("genus", "family","order", "class", "phylum")
+r2_tablex <- dplyr::select(r2_tablex, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_tablex
+```
+
+Here's the same table, but the terms are adding in the opposite order, so we're going from root (phyla) to tips (genera). The biggest jumps happen towards the tips with families and genera.
+
+```{r}
+# backwards taxa
+reg1 <- lmer(hsi_comb ~ log10(pubs_pubmed_spname_group+1) + lcl_max_fac + (1|parasite_phylum),
+            data = dat,
+            REML=T)
+reg2 <- update(reg1, . ~ . + (1|parasite_class))
+reg3 <- update(reg2, . ~ . + (1|parasite_order))
+reg4 <- update(reg3, . ~ . + (1|parasite_family))
+reg5 <- update(reg4, . ~ . + (1|parasite_genus))
+# anova(reg1, reg2, reg3, reg4, reg5)
+
+mod_list <- list(reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+r2_tabley <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_tabley$step <- rev(c("genus", "family","order", "class", "phylum"))
+r2_tabley <- dplyr::select(r2_tabley, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_tabley
+
+```
+
+Here is the same information, but plotted. Taxonomic dissimilarity varies mostly between families and genera.
+
+```{r}
+r2_tablex$approach <- 'up taxonomic tree'
+r2_tabley$approach <- 'down taxonomic tree'
+r2_tablex$levels <- 1:5
+r2_tabley$levels <- 1:5
+r2_tax <- bind_rows(r2_tablex, r2_tabley)
+
+r2_tax <- mutate(r2_tax, label_pos = if_else(approach == "up taxonomic tree", tax_var_explained + 0.01, tax_var_explained - 0.01))
+```
+```{r}
+syb <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) +
+  geom_path() +
+  geom_label(aes(label = step)) +
+  labs(x = "Taxonomic levels in model", y = "Proportion of variation explained by taxonomy", title = "Species-level, taxonomic dissimilarity") +
+  theme(panel.grid.minor = element_blank()) +
+  guides(color = FALSE) +
+  scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5))
+syb
+# ggsave(syb, filename = "../../figs/FigSYb.png", device = 'png', width = 4.5, height = 4.5)
+ggsave(syb, filename = "../../figs/FigSYb.svg", device = 'svg', width = 4.5, height = 4.5)
+```
+
+Let's look more closely at families, because with genera, there are quite a few with just one or two species, such that the random effect estimate are imprecise. We'll take the random effect estimates for parasite family from the model accounting for study effort and life cycle length. Then, we'll sort them to see which families rank high (generalists) or low (specialists). 
+
+```{r}
+rx <- ranef(reg3.1)$parasite_family
+names(rx) <- 're'
+rx$family <- row.names(rx)
+# qplot(rx$re)
+```
+
+Here are the families above the 90th percentile for generalism.
+
+```{r}
+rx <- arrange(rx, desc(re))
+rx <- mutate(rx, re_quantile = if_else(re > quantile(re, probs = 0.9), "top 10%", 
+                                       if_else(re < quantile(re, probs = 0.1), "bottom 10%", "middle 80%")))
+filter(rx, re_quantile == "top 10%")%>%
+  arrange(desc(re))%>%
+  left_join(select(dat, parasite_family, parasite_phylum)%>%distinct(), 
+            by = c('family' = 'parasite_family'))
+```
+Here are the families below the 10th percentile for generalism (specialists).
+
+```{r}
+filter(rx, re_quantile == "bottom 10%")%>%
+  arrange(re)%>%
+  left_join(select(dat, parasite_family, parasite_phylum)%>%distinct(), 
+            by = c('family' = 'parasite_family'))
+```
+
+In both lists, there are nematodes and cestodes, which shouldn't be surprising, since phyla had little explanatory value. There is also not anything that obviously unites the groups. In other words, it is hard to say why some families are more specialized than others.
+
+Let's plot the individual species in these family groups.
+
+```{r}
+top_ten <- filter(rx, re_quantile == "top 10%")$family
+bot_ten <- filter(rx, re_quantile == "bottom 10%")$family
+
+dat <- mutate(dat, tax_eff = if_else(parasite_family %in% top_ten, "in top 10% family", 
+                                     if_else(parasite_family %in% bot_ten, "in bottom 10% family", "in mid 80% family")))
+```
+
+We can see that species from generalist or specialist families separate along the y-axis as expected, though they can still be quite variable. The variability is a reminder that taxonomy only explained <20% of the variation in generalism in the final model. 
+
+```{r}
+ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(aes(color = tax_eff, alpha = tax_eff, size = zstudy_effort),
+             position = position_jitter(width = 0.2, height = 0)) +
+  scale_alpha_manual(values = c(1,0.2,1)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Life cycle length (max)", y = "Tax dissim index")
+```
+
+The patterns are clearer when we have boxplots for each family, but even here the differences between generalist and specialist families are not extremely pronounced.
+
+```{r}
+ ggplot( filter(dat, tax_eff != 'in mid 80% family')%>%
+          mutate(parasite_family = factor(parasite_family, levels = rx$family)),
+        aes(x = parasite_family, y = hsi_comb, color = tax_eff)) +
+  geom_boxplot() +
+  # scale_y_log10() +
+  labs(x = NULL, y = "Taxonomic dissimilarity", color = NULL) +
+  coord_flip() 
+```
+
+Not all specialist families (bottom 10%) have more restricted host ranges than generalist families (top 10%). Rather than looking at raw values, perhaps we can compare the median predicted value for a family (given life cycle length and study effort) to the observed median dissimilarity. That is the next plot, and it demonstrates how many more hosts some families exhibit, on average, compared to expectations.
+
+```{r}
+dat$best_mod_preds <- predict(reg3.1, re.form = NA) # add preds from best model
+fam_exp <- dat%>%group_by(parasite_family)%>%
+  summarize(observed = median(hsi_comb, na.rm = T),
+            predicted = median(best_mod_preds, na.rm = T),
+            n = n())
+fam_exp <- mutate(fam_exp, tax_eff = if_else(parasite_family %in% top_ten, "in top 10% family", 
+                                     if_else(parasite_family %in% bot_ten, "in bottom 10% family", "in mid 80% family")))%>%
+  mutate(fam_resid = observed - predicted)
+
+fam_exp <- gather(fam_exp, key = "obs_pred", value = "hosts", observed:predicted)
+```
+```{r}
+ ggplot( filter(fam_exp, tax_eff != 'in mid 80% family')%>%
+          mutate(parasite_family = factor(parasite_family, levels = rx$family)),
+        aes(x = parasite_family, y = hosts)) +
+  geom_line(aes(group = parasite_family), color = 'black') +
+  geom_point(aes(shape = obs_pred, size = n, color = obs_pred) ) +
+  facet_wrap(~tax_eff, scales = 'free', ncol = 1) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = NULL, y = "Host species", color = NULL, shape = NULL, size = "Number of species") +
+    theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank()) +
+  coord_flip()
+```
+
+Here's a similar plot, but for all families, ordered by the observed host range. This shows how the model predicts differences due to life cycle lengths, but not the variation within life cycle lengths.
+
+```{r}
+fams_ordered <- filter(fam_exp, obs_pred == 'observed')%>%
+  arrange(hosts)
+fams_ordered <- fams_ordered$parasite_family
+ggplot( fam_exp%>%mutate(parasite_family = factor(parasite_family, levels = fams_ordered)),
+        aes(x = parasite_family, y = hosts)) +
+  geom_line(aes(group = parasite_family), color = 'black') +
+  geom_point(aes(shape = obs_pred, size = n, color = obs_pred) ) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = NULL, y = "Host species", color = NULL, shape = NULL, size = "Number of species") +
+    theme(panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank()) +
+  coord_flip()
+```
+
+Finally, I checked whether the random effect estimates are influenced by the other taxonomic variables. I re-fit the model with only parasite family, extracted the estimated family effects, and then compared them to those from the full model. They are quite well correlated, though the effect is much stronger (steeper) in the family-only model, because the variance due to generic differences is assigned to family.
+
+```{r}
+regf <- update(reg3.1, . ~ . - (1|parasite_phylum) - (1|parasite_class) - (1|parasite_order) - (1|parasite_genus) )
+
+rxx <- ranef(regf)$parasite_family
+names(rxx) <- 're2'
+rxx$family <- row.names(rxx)
+rxx <- left_join(rx, rxx)
+qplot(data=rxx, x = re, y = re2) +
+  geom_abline(slope = 1, intercept = 0) +
+  geom_smooth(method = lm, linetype = 'dotted', se = F) +
+  labs(x = 'Family effect, full tax model', y = 'Family effect, family-only model')
+rm(rxx)
+```
+
+# Conclusions
+
+We compared three ways to structure the model and found that a standard linear mixed model performed about as well as a model excluding troublesome data or a model in which the response metric was square transformed. Then, we fit a series of models to test hypotheses. We found that taxonomic dissimilarity among hosts increases with parasite life cycle length, but mainly from 1 to 2 hosts, and not much after that. After accounting for life cycle length, taxonomy still explained some of the variation in host range. Taxonomic variation mainly occurs at the level of genera and families, i.e towards the tips.

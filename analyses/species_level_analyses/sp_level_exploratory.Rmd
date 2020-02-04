@@ -1,0 +1,333 @@
+---
+title: "Species level analysis - exploration"
+author: "Dan Benesh"
+date: "12/22/2019"
+output: html_document
+---
+
+# Background
+
+One constraint on the evolution of complex life cycles is that parasites need to infect diverse hosts with different physiologies and immune systems. In other words, it is presumed to be costly to be a generalist. However, whether complex life cycle parasites actually infect a wider range of hosts has never been tested. The goal of this script is to test whether longer life cycles (i.e. more successive hosts before reproduction) are associated with a wider host range.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+I used data from several sources: (1) [life cycle database]() (for parasite life cycle lengths and host records), (2) host-parasite database from the NHM London (to acquire a more exhaustive list of host records for each parasite), (3) genbank sequences (to make a parasite phylogeny), (4) NCBI taxonomy database (to get the basic taxonomic hierarchy for every host species), and (5) PubMed (to estimate study effort on each parasite species).
+
+```{r importdata}
+lcdb <- read.csv(file = "../../data/CLC_database_updated_names.csv", header = TRUE)
+dat <- read.csv(file = "../../data/spp_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "../parasite_phylogeny/full_tree_time_calib.nex")
+tip_names <- read.csv(file = "../../data/data_tree_tips_table.csv")
+```
+
+```{r}
+dat <- left_join(dat, tip_names)
+dat <- left_join(dat, select(lcdb, Parasite.species, Parasite.group)%>%distinct())
+dat <- mutate(dat, lcl_max_fac = as.character(lcl_max))%>%
+  mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
+```
+```{r}
+# worm taxonomy
+acanth_tax <- read.csv("../parasite_phylogeny/acanth_taxonomy.csv")
+acanth_tax <- select(acanth_tax, species, genus, family, order, class, phylum)
+
+cest_tax <- read.csv("../parasite_phylogeny/cest_taxonomy.csv")
+cest_tax <- select(cest_tax, species, genus, family, order, class, phylum)
+
+nem_tax <- read.csv("../parasite_phylogeny/nem_taxonomy_rotl.csv")
+nem_tax <- select(nem_tax, species, genus, family, order, class, phylum)
+
+worm_tax <- rbind(acanth_tax, cest_tax, nem_tax)
+```
+```{r}
+# join worm taxonomy based on genus name
+dat <- mutate(dat, parasite_genus = substr(tree_tips, start = 1, stop = regexpr("_", tree_tips)-1))
+
+dat <- left_join(dat,
+                 select(worm_tax, parasite_genus = genus, parasite_family = family, parasite_order = order, parasite_class = class, parasite_phylum = phylum)%>%distinct(),
+                 by = 'parasite_genus')
+```
+
+
+# Descriptive statistics
+
+How many species are in the life cycle database?
+
+```{r}
+length(unique(dat$Parasite.species))
+```
+
+I entered species into the database, even if they only had partial life cycle information. For example, the *Anisakis* life cycle has been worked out, but several cryptic species have been identified, and the first intermediate host has not been demonstrated for each cryptic species. Thus, there is a presumed life cycle in the database, but it is marked with the qualifier that there is 'missing info'.
+
+```{r}
+# make variable to remove species with incomplete life cycle information
+incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
+  select(Parasite.species)%>%
+  distinct()
+dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "not facultative"),
+              partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
+                                           "partial", "complete"))
+```
+
+How many species have such missing info?
+
+```{r}
+length(unique(incomplete_lc$Parasite.species))
+```
+
+```{r}
+# # run this block to exclude species with partial life cycles! 
+dat <- filter(dat, partial_cycle != "partial")
+tree <- keep.tip(tree, tip = dat$tree_tips)
+```
+
+
+Are all the parasite species in the life cycle database included in the tree?
+
+```{r}
+spp_not_in_tree <- dat$tree_tips[!(dat$tree_tips %in% tree$tip.label)]
+length(spp_not_in_tree) == 0
+```
+
+```{r}
+row.names(dat) <- dat$tree_tips # set row names to same as tree tip labels
+```
+
+How many unique host-parasite combinations are in the life cycle database?
+
+```{r}
+sum(dat$num_hosts_lcdb)
+```
+
+How many unique host-parasite records are there when combining the life cycle database and NHM records?
+
+```{r}
+sum(dat$num_hosts_lcdb_nhm)
+```
+
+A number of parasite species have facultative life cycles; they can complete their life cycle with or without infecting certain hosts. For this reason, I calculated two measures of life cycle length: maximum life cycle length (goes through all hosts prior to reproduction) or minimum life cycle length (goes through the fewest number of hosts prior to reproduction). 
+
+How many of these facultative species are in the dataset?
+
+```{r}
+length(filter(dat, lcl_max != lcl_min)$Parasite.species)
+```
+
+
+# The relationship between life cycle length and host specificity
+
+I plot the relationship between life cycle length and host specificity. I examine two different measures of host specificity: (1) host range (the number of hosts from which a parasite has been recorded), and (2) an index proposed by [Poulin and Mouillot 2003](https://doi.org/10.1017/S0031182003002993) that accounts for the taxonomic similarity of hosts. After visualizing the patterns, I fit some phylogenetic models.
+
+## Host range
+
+Parasite species with longer life cycles have been reported from more host species, which is consistent with the idea that complex life cycle parasites are generalists.
+
+```{r}
+ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.3, position = position_jitter(width = 0.2, height = 0)) +
+  scale_y_log10() +
+  #geom_smooth(se = F, method = 'lm') +
+  labs(x = "Life cycle length (max)", y = "Host range (LCDB + NHM)")
+```
+
+This pattern is also clear when we account for study effort. More intensively studied parasites have been recorded from more hosts, and for a given study effort, parasites with longer life cycles have been recorded from more hosts.
+
+```{r}
+ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = pubs_pubmed_spname_group+1, color = lcl_max_fac)) +
+  geom_point(alpha = 0.3) +
+  scale_x_log10() + scale_y_log10() +
+  geom_smooth(se = F, method = 'lm') +
+  labs(color = "Life cycle length", x = "Study effort (Pubmed hits)", y = "Host range (LCDB + NHM)")
+```
+
+The lines are normal linear regressions, not phylogenetic ones, but the pattern appears to occur in each of the main parasite groups in the data.
+
+```{r}
+ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = pubs_pubmed_spname_group+1, color = lcl_max_fac)) +
+  geom_point(alpha = 0.3) +
+  scale_x_log10() + scale_y_log10() +
+  geom_smooth(se = F, method = 'lm') +
+  labs(color = "Life cycle length", x = "Study effort (Pubmed hits)", y = "Host range (LCDB + NHM)") + 
+  facet_grid(~Parasite.group)
+```
+
+For a given study effort, worms with facultative life cycles do not have more host species, so the min vs max life cycle length distinction might not be useful here.
+
+```{r}
+ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = pubs_pubmed_spname_group+1, color = facultative_lc)) +
+  geom_point(alpha = 0.3) +
+  scale_x_log10() + scale_y_log10() +
+  geom_smooth(se = F, method = 'lm') +
+  labs(color = "Life cycle length", x = "Study effort (Pubmed hits)", y = "Host range (LCDB + NHM)") + 
+  facet_grid(~lcl_max_fac)
+```
+
+
+## Host specificity index
+
+If one parasite species infects two closely related host species while a second parasite infects two distantly related hosts, then we would consider the second parasite species more of a generalist, even though their host range, as defined above, would be the same (i.e. 2). An index proposed by [Poulin and Mouillot 2003](https://doi.org/10.1017/S0031182003002993) accounts for this. Higher values of their index indicate that parasites have been found in more distantly related hosts, while low values indicate they have been recorded in more taxonomically similar hosts.
+
+First, let's see how host range and this host specificity index are related.
+
+```{r}
+ggplot(dat, aes(x = num_hosts_lcdb_nhm, y = hsi_comb)) +
+  geom_point(alpha = 0.3) +
+  scale_x_log10() +
+  geom_smooth(se = F) +
+  labs(x = "Host range (LCDB + NHM)", y = "Taxonomic dissimilarity index")
+```
+
+They are not correlated, but there is more variability in the index when parasites have been recorded from fewer hosts.
+
+The index increases with life cycle length, but in a non-linear way. Simple life cycle species tend to infect host species from the same genus or family. Complex life cycle species, by contrast, infect hosts from different orders, classes, or even phyla (e.g. invertebrate intermediate host, vertebrate definitive host). 
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+
+ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.2, height = 0)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index (LCDB + NHM)")
+```
+
+The pattern is driven by the nematodes, as they are the only group with species with direct life cycles.
+
+```{r}
+ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.2, height = 0)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index (LCDB + NHM)") +
+  facet_grid(~Parasite.group)
+```
+
+There was little relationship between study effort and the value of the index, suggesting that more intense study of a parasite does not typically result in taxonomically disparate new hosts being reported.
+
+```{r}
+ggplot(dat, aes(y = hsi_comb, x = pubs_pubmed_spname_group+1)) +
+  geom_point(alpha = 0.2) +
+  scale_x_log10() +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  geom_smooth(se = F) +
+  labs(x = "Study effort (Pubmed hits)", y = "Taxonomic dissimilarity index (LCDB + NHM)") 
+```
+
+This index can only be calculated if full taxonomic information is available. There were over 7000 unique host species in the dataset, and, even though I corrected misspellings and tried to have the most up-to-date names, not all host species were found in the NCBI taxonomy database. So, another factor that could affect this index is how many records had to be tossed out because of missing taxonomic information.
+
+There is not much of a relationship between the number of host records without taxonomic data and the value of the index. Perhaps the index is a bit higher if more host records lacked taxonomic data. I probably would have expected the opposite: more missing data, more similarity among host species.
+
+```{r}
+ggplot(dat, aes(y = hsi_comb, x = hosts_missing_tax_comb)) +
+  geom_point(alpha = 0.1, aes(size = num_hosts_lcdb_nhm)) +
+  #scale_x_log10() +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  geom_smooth(se = F) +
+  labs(x = "Host records with missing taxonomy", y = "Taxonomic dissimilarity index (LCDB + NHM)", size = "Host records") 
+```
+
+For a given study effort, worms with facultative life cycles do not have more host species, so the min vs max life cycle length distinction might not be useful here.
+
+```{r}
+ggplot(dat, aes(y = hsi_comb, x = pubs_pubmed_spname_group+1, color = facultative_lc)) +
+  geom_point(alpha = 0.1) +
+  scale_x_log10() +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  geom_smooth(se = F) +
+  labs(x = "Study effort", y = "Taxonomic dissimilarity index (LCDB + NHM)", color = "Facultative")+
+  facet_grid(~lcl_max_fac)
+```
+
+## Phylogenetic distribution of host specificity values
+
+The helminth groups (acanths, nematodes, cestodes) in the dataset evolved complex life cycles independently, but within a group, closely related species may exhibit similar patterns of host use. We need to account for this in analyses, and I find it useful to look at the phylogenetic distribution of our dependent variables.
+
+```{r}
+library(ggtree)
+```
+
+Let's look at host range in each helminth group separately. In the next three plots, the phylogeny is on the left, while the bars on the right represent the host range. The nematode and cestode phylogenies are too big to make a decent plot, so I just took 100 random species in each.
+
+```{r}
+# reduce tree
+acanths <- filter(dat, Parasite.group == 'acanthocephalan')$tree_tips
+tree_acanths <- keep.tip(tree, acanths)
+
+tree_df <- fortify(tree_acanths)
+tree_df <- left_join(tree_df, dat, by = c("label" = "tree_tips"))
+
+p <- ggtree(tree_df)
+facet_plot(p, panel = 'Host range', 
+           data = dplyr::select(dat, id = tree_tips, val = num_hosts_lcdb_nhm),
+           geom = geom_segment, aes(x=0, xend = log10(val), y = y, yend = y)) +
+  labs(title = "Acanths, host range")
+```
+
+```{r}
+cest <- filter(dat, Parasite.group == 'cestode')$tree_tips
+tree_cest <- keep.tip(tree, sample(cest, size = 100, replace = FALSE)) 
+tree_df <- fortify(tree_cest)
+tree_df <- left_join(tree_df, dat, by = c("label" = "tree_tips"))
+p <- ggtree(tree_df, size = 0.25)
+facet_plot(p, panel = 'Host range', 
+           data = dplyr::select(dat, id = tree_tips, val = num_hosts_lcdb_nhm),
+           geom = geom_segment, aes(x=0, xend = log10(val), y = y, yend = y)) +
+  labs(title = "Cestodes, host range, random 100 species")
+```
+
+```{r}
+nem <- filter(dat, Parasite.group == 'nematode')$tree_tips
+tree_nem <- keep.tip(tree, sample(nem, size = 100, replace = FALSE))
+tree_df <- fortify(tree_nem)
+tree_df <- left_join(tree_df, dat, by = c("label" = "tree_tips"))
+p <- ggtree(tree_df, size = 0.25)
+facet_plot(p, panel = 'Host range', 
+           data = dplyr::select(dat, id = tree_tips, val = num_hosts_lcdb_nhm),
+           geom = geom_segment, aes(x=0, xend = log10(val), y = y, yend = y)) +
+  labs(title = "Nematodes, host range, random 100 species")
+```
+
+Host range does not obviously differ from one clade to the next in any of the groups. One possible reason for this is that host range was confounded with study effort, and study effort is probably not phylogenetically structured. For example, even well studied groups, like the genus *Taenia*, includes less studied species.
+
+I next make the same three plots, but for the taxonomic dissimilarity index. And again, there is not an obvious phylogenetic structure to the data.
+
+```{r}
+tree_df <- fortify(tree_acanths)
+tree_df <- left_join(tree_df, dat, by = c("label" = "tree_tips"))
+
+p <- ggtree(tree_df)
+facet_plot(p, panel = 'Tax dissimilarity', 
+           data = dplyr::select(dat, id = tree_tips, val = hsi_comb),
+           geom = geom_segment, aes(x=1, xend = val, y = y, yend = y)) +
+    labs(title = "Acanths, host specificity index")
+```
+```{r}
+tree_df <- fortify(tree_cest)
+tree_df <- left_join(tree_df, dat, by = c("label" = "tree_tips"))
+
+p <- ggtree(tree_df)
+facet_plot(p, panel = 'Tax dissimilarity', 
+           data = dplyr::select(dat, id = tree_tips, val = hsi_comb),
+           geom = geom_segment, aes(x=1, xend = val, y = y, yend = y)) +
+    labs(title = "Cestodes, host specificity index")
+```
+```{r}
+tree_df <- fortify(tree_nem)
+tree_df <- left_join(tree_df, dat, by = c("label" = "tree_tips"))
+
+p <- ggtree(tree_df)
+facet_plot(p, panel = 'Tax dissimilarity', 
+           data = dplyr::select(dat, id = tree_tips, val = hsi_comb),
+           geom = geom_segment, aes(x=1, xend = val, y = y, yend = y)) +
+    labs(title = "Nematodes, host specificity index")
+```
+

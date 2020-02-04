@@ -1,0 +1,423 @@
+---
+title: "Explore NHM data"
+author: "Dan Benesh"
+date: "7/2/2019"
+output: html_document
+---
+
+In this notebook, I explore the data returned by the NHM database. I look at its relationship to life cycle length. I create a dataframe with most of the variables needed for the analysis:
+
+* Two versions of host range, one calculated with just the life cycle database, the other calculated with the life cycle database and NHM database combined
+* Two versions of life cycle length, with (max) or without (min) facultative hosts
+* Measure of study efforts, the best of which is PubMed hits from query of species name with taxonomic group
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(helminthR)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r importdata}
+dat_host <- read.csv(file = "../../data/CLC_database_hosts.csv", header = TRUE)
+dat_nhm <- read.csv(file = "../../data/NHM_db_hosts.csv", header = TRUE)
+dat_study <- read.csv(file = "../../data/study_effort.csv")
+dat_hsi <- read.csv(file = "../../data/taxonomic_dissimilarity_index_sp_level.csv")
+dat_hosts_corrected <- read.csv(file = "../../data/host_names_corrected_valid.csv")
+```
+```{r}
+dat_study <- select(dat_study, Parasite.species, pubs_lcdb = n_lcdb, pubs_pubmed_spname = n_pubmed_spname, pubs_pubmed_spname_group = n_pubmed_spname_group)
+```
+
+First, I replace host names in the life cycle database and the NHM database with those obtained from GNR and COL (see [here](get_host_taxonomy/fix_names_find_synonyms.Rmd)). To do that, I need to adjust species names in the same way I did before querying the taxonomic databases, e.g. change 'spp.' to 'sp.', remove vague host records, remove subgenera, removing whitespace, remove hybrids, etc.
+
+```{r}
+# remove vague host records starting with parentheses or brackets
+dat_nhm <- filter(dat_nhm, !grepl(pattern = "^\\(", Host))%>% 
+  filter(!grepl(pattern = "^\\[", Host))%>%
+  select(Parasite.species = Parasite, Host.species = Host)
+dat_host <- filter(dat_host, !grepl(pattern = "^\\(", Host.species))%>% 
+  filter(!grepl(pattern = "^\\[", Host.species))
+
+# remove subgenera from host names
+dat_nhm <- mutate(dat_nhm, Host.species = gsub(pattern = "\\(.*\\) ", replacement = "", Host.species))
+dat_host <- mutate(dat_host, Host.species = gsub(pattern = "\\(.*\\) ", replacement = "", Host.species))
+```
+```{r}
+# manually correct some host records; things not found by GNR in first go
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Acitits macularia")] <- "Actitis macularius"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Atelexia albiventris")] <- "Atelerix albiventris"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Centophilus sp.")] <- "Ceuthophilus sp."
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Candonia ")] <- "Candona sp."
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Cincindella erudata")] <- "Cicindela erudata"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Cincindella sexpunctata")] <- "Cicindela sexpunctata"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Cincindella vigintigutta")] <- "Cicindela vigintigutta"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Chelodina Iongicollis")] <- "Chelodina longicollis"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Cionella Iubrica")] <- "Cionella lubrica"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Coryphilla sp.")] <- "Coryphella sp."
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Cylindrojulus sp.")] <- "Cylindroiulus sp."
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Dusycion culpaeus")] <- "Lycalopex culpaeus"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Dusycion griseus")] <- "Lycalopex griseus"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Helodrillus ")] <- "Helodrilus"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Lepidocirtus sp.")] <- "Lepidocyrtus sp."
+dat_nhm$Host.species[which(dat_nhm$Host.species == "M?n???lephorus rubroniveus")] <- "Monopylephorus rubroniveus"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Meleagridis gallopavo silvestris")] <- "Meleagris gallopavo"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Ototylomysphyllotis phyllotis")] <- "Ototylomys phyllotis"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Paracylopina sp.")] <- "Paracyclopina sp."
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Pleurdonte sagemon")] <- "Pleurodonte sagemon"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Procyonis lotor")] <- "Procyon lotor"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Tenebriodes nana")] <- "Tenebroides nana"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Thryrissa hamiltoni")] <- "Thryssa hamiltonii"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Thylacine cynocephalus")] <- "Thylacinus cynocephalus"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Trichorythodes")] <- "Tricorythodes"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Utorides striatus")] <- "Butorides striata"
+dat_nhm$Host.species[which(dat_nhm$Host.species == "Exorbatula sp. cf. biundatus")] <- "Exoribatula sp."
+
+dat_host$Host.species[which(dat_host$Host.species == "Acitits macularia")] <- "Actitis macularius"
+dat_host$Host.species[which(dat_host$Host.species == "Atelexia albiventris")] <- "Atelerix albiventris"
+dat_host$Host.species[which(dat_host$Host.species == "Centophilus sp.")] <- "Ceuthophilus sp."
+dat_host$Host.species[which(dat_host$Host.species == "Candonia ")] <- "Candona sp."
+dat_host$Host.species[which(dat_host$Host.species == "Cincindella erudata")] <- "Cicindela erudata"
+dat_host$Host.species[which(dat_host$Host.species == "Cincindella sexpunctata")] <- "Cicindela sexpunctata"
+dat_host$Host.species[which(dat_host$Host.species == "Cincindella vigintigutta")] <- "Cicindela vigintigutta"
+dat_host$Host.species[which(dat_host$Host.species == "Chelodina Iongicollis")] <- "Chelodina longicollis"
+dat_host$Host.species[which(dat_host$Host.species == "Cionella Iubrica")] <- "Cionella lubrica"
+dat_host$Host.species[which(dat_host$Host.species == "Coryphilla sp.")] <- "Coryphella sp."
+dat_host$Host.species[which(dat_host$Host.species == "Cylindrojulus sp.")] <- "Cylindroiulus sp."
+dat_host$Host.species[which(dat_host$Host.species == "Dusycion culpaeus")] <- "Lycalopex culpaeus"
+dat_host$Host.species[which(dat_host$Host.species == "Dusycion griseus")] <- "Lycalopex griseus"
+dat_host$Host.species[which(dat_host$Host.species == "Helodrillus ")] <- "Helodrilus"
+dat_host$Host.species[which(dat_host$Host.species == "Lepidocirtus sp.")] <- "Lepidocyrtus sp."
+dat_host$Host.species[which(dat_host$Host.species == "M?n???lephorus rubroniveus")] <- "Monopylephorus rubroniveus"
+dat_host$Host.species[which(dat_host$Host.species == "Meleagridis gallopavo silvestris")] <- "Meleagris gallopavo"
+dat_host$Host.species[which(dat_host$Host.species == "Ototylomysphyllotis phyllotis")] <- "Ototylomys phyllotis"
+dat_host$Host.species[which(dat_host$Host.species == "Paracylopina sp.")] <- "Paracyclopina sp."
+dat_host$Host.species[which(dat_host$Host.species == "Pleurdonte sagemon")] <- "Pleurodonte sagemon"
+dat_host$Host.species[which(dat_host$Host.species == "Procyonis lotor")] <- "Procyon lotor"
+dat_host$Host.species[which(dat_host$Host.species == "Tenebriodes nana")] <- "Tenebroides nana"
+dat_host$Host.species[which(dat_host$Host.species == "Thryrissa hamiltoni")] <- "Thryssa hamiltonii"
+dat_host$Host.species[which(dat_host$Host.species == "Thylacine cynocephalus")] <- "Thylacinus cynocephalus"
+dat_host$Host.species[which(dat_host$Host.species == "Trichorythodes")] <- "Tricorythodes"
+dat_host$Host.species[which(dat_host$Host.species == "Utorides striatus")] <- "Butorides striata"
+dat_host$Host.species[which(dat_host$Host.species == "Exorbatula sp. cf. biundatus")] <- "Exoribatula sp."
+```
+```{r}
+# replace all instances of spp. with sp.
+dat_nhm <- mutate(dat_nhm, Host.species = gsub("spp\\.", "sp\\.", Host.species))
+dat_host <- mutate(dat_host, Host.species = gsub("spp\\.", "sp\\.", Host.species))
+
+# remove trailing white space in host names
+dat_nhm <- mutate(dat_nhm, Host.species = gsub("\\s+$", "", Host.species)) 
+dat_host <- mutate(dat_host, Host.species = gsub("\\s+$", "", Host.species)) 
+
+# add 'sp.' to all instances of just genera given, e.g. 'Gammarus' is changed to 'Gammarus sp.'
+dat_nhm <- mutate(dat_nhm, Host.species = if_else( !grepl(" ", Host.species), # if 1 word host name, add sp.
+                                                             paste(Host.species, "sp."),
+                                                             Host.species))
+dat_host <- mutate(dat_host, Host.species = if_else( !grepl(" ", Host.species), # if 1 word host name, add sp.
+                                                             paste(Host.species, "sp."),
+                                                             Host.species))
+
+# remove records that are hybrids
+dat_nhm <- filter(dat_nhm, !grepl("hybrid$", Host.species))
+dat_host <- filter(dat_host, !grepl("hybrid$", Host.species))
+```
+
+Add to the best host name into the life cycle database and nhm database.
+
+```{r}
+dat_nhm <- left_join(dat_nhm, select(dat_hosts_corrected, host_record_lcdb_nhm, best_host_name), by = c("Host.species" = "host_record_lcdb_nhm"))
+dat_host <- left_join(dat_host, select(dat_hosts_corrected, host_record_lcdb_nhm, best_host_name), by = c("Host.species" = "host_record_lcdb_nhm"))
+```
+```{r}
+# # for other scripts, can use the files with updated names
+# write.csv(dat_nhm, file = "../data/NHM_db_hosts_updated_names.csv", row.names = F)
+# write.csv(dat_host, file = "../data/CLC_database_updated_names.csv", row.names = F)
+```
+
+In each dataset, we want to remove entries like *Genus sp.* only if there are other hosts with the same genus. This avoids inflating host counts.
+
+```{r}
+# first run this for the lcdb dataset
+dat_host <- mutate(dat_host, best_genus = substr(best_host_name, 1, regexpr(" ", best_host_name)-1)) # make genus var
+
+rows_w_genussp <- which( grepl("sp\\.", dat_host$best_host_name)) # id rows to check
+
+
+# loop through rows to check, find cases where there are congenerics with the Genus sp. row
+rows_to_remove <- numeric()
+for(i in rows_w_genussp){
+  g_check <- dat_host[i, "best_genus"]
+  mv <- dat_host[i,]
+  ds <- filter(dat_host, Parasite.species == mv$Parasite.species)
+  occ_of_genus <- sum(ds$best_genus == g_check, na.rm=T)
+  
+  if(occ_of_genus > 1) {
+    # if more than one occurrence of genus, mark row for removal
+    rows_to_remove <- c(rows_to_remove, i)
+  }
+}
+
+
+dat_host <- dat_host[-rows_to_remove,] # remove them
+```
+```{r}
+# then for the nhm data
+dat_nhm <- mutate(dat_nhm, best_genus = substr(best_host_name, 1, regexpr(" ", best_host_name)-1)) # make genus var
+
+rows_w_genussp <- which( grepl("sp\\.", dat_nhm$best_host_name)) # id rows to check
+
+
+# loop through rows to check, find cases where there are congenerics with the Genus sp. row
+rows_to_remove <- numeric()
+for(i in rows_w_genussp){
+  g_check <- dat_nhm[i, "best_genus"]
+  mv <- dat_nhm[i,]
+  ds <- filter(dat_nhm, Parasite.species == mv$Parasite.species)
+  occ_of_genus <- sum(ds$best_genus == g_check, na.rm=T)
+  
+  if(occ_of_genus > 1) {
+    # if more than one occurrence of genus, mark row for removal
+    rows_to_remove <- c(rows_to_remove, i)
+  }
+}
+
+
+dat_nhm <- dat_nhm[-rows_to_remove,] # remove them
+```
+
+
+
+# Wrangling
+
+I make a species level df with host range from just LCDB.
+
+```{r}
+num_hosts <- filter(dat_host, !is.na(Host.species), !is.na(Host.common.name))%>%
+  select(Parasite.species, best_host_name)%>%
+  distinct()%>%
+  group_by(Parasite.species)%>%
+  summarize(num_hosts_lcdb = n())
+```
+
+For comparison, I also calculate how many records are in the NHM for each species.
+
+```{r}
+num_hosts_nhm <- select(dat_nhm, Parasite.species, best_host_name)%>%
+  distinct()%>%
+  group_by(Parasite.species)%>%
+  summarize(num_hosts_nhm = n())
+```
+
+Then I combine the host records from LCDB with those from NHM and again calculate host range.
+
+```{r}
+dat_host_red <- filter(dat_host, !is.na(Host.species), !is.na(Host.common.name))%>%
+  select(Parasite.species, best_host_name)
+dat_nhm_red <- select(dat_nhm, Parasite.species, best_host_name)
+```
+```{r}
+# combine them
+dat_lcdb_nhm <- bind_rows(dat_host_red, dat_nhm_red)%>%distinct() # using corrected instead of uncorrected host names elminates about 2000 unique host-parasite combos
+```
+```{r}
+# remove GENUS SP. cases in combined data
+dat_lcdb_nhm <- mutate(dat_lcdb_nhm, best_genus = substr(best_host_name, 1, regexpr(" ", best_host_name)-1)) # make genus var
+
+rows_w_genussp <- which( grepl("sp\\.", dat_lcdb_nhm$best_host_name)) # id rows to check
+
+
+# loop through rows to check, find cases where there are congenerics with the Genus sp. row
+rows_to_remove <- numeric()
+for(i in rows_w_genussp){
+  g_check <- dat_lcdb_nhm[i, "best_genus"]
+  mv <- dat_lcdb_nhm[i,]
+  ds <- filter(dat_lcdb_nhm, Parasite.species == mv$Parasite.species)
+  occ_of_genus <- sum(ds$best_genus == g_check, na.rm=T)
+  
+  if(occ_of_genus > 1) {
+    # if more than one occurrence of genus, mark row for removal
+    rows_to_remove <- c(rows_to_remove, i)
+  }
+}
+
+
+dat_lcdb_nhm <- dat_lcdb_nhm[-rows_to_remove,] # remove them
+```
+
+```{r}
+# calculate number of hosts for each parasite
+num_hosts2 <- group_by(dat_lcdb_nhm, Parasite.species)%>%
+  summarize(num_hosts_lcdb_nhm = n())
+```
+
+Some species names were returned by the NHM queries that were not in the LCDB. Not sure why.
+
+```{r}
+# which species names are in NHM, but not LCDB?
+select(dat_nhm_red, Parasite.species)%>%
+  distinct()%>%
+  filter(!(Parasite.species %in% dat_host$Parasite.species))
+```
+
+Here are species in the LCDB that did not have hits in the NHM database
+
+```{r}
+# which are in lcdb, but not NHM
+select(dat_host, Parasite.species)%>%
+  distinct()%>%
+  filter(!(Parasite.species %in% dat_nhm_red$Parasite.species))
+```
+
+We can exclude the extra names returned by the NHM query and limit the database to just records for species names in the LCDB.
+
+```{r}
+num_hosts2 <- filter(num_hosts2, Parasite.species %in% dat_host$Parasite.species)
+```
+```{r}
+num_hosts <- left_join(num_hosts, num_hosts_nhm)
+num_hosts <- left_join(num_hosts, num_hosts2)
+```
+
+Species with a lot of hosts in the LCDB also tend to have a lot of host records in the combined database. However, there are cases where a worm had few hosts in the lcdb and many hosts in the nhm.
+
+```{r}
+ggplot(num_hosts, aes(x = num_hosts_lcdb, y = num_hosts_nhm)) + 
+  geom_point(alpha = 0.3) + geom_smooth() +
+  scale_x_log10() + scale_y_log10()
+```
+```{r}
+summary(lm(log10(num_hosts_lcdb) ~ log10(num_hosts_nhm), data = num_hosts))
+```
+
+Now, we'll add two measures of life cycle length for each species to the data, the minimum and maximum life cycle length.
+
+```{r}
+lcl <- filter(dat_host, Facultative != 'postcyclic')%>%
+  group_by(Parasite.species)%>%
+  summarize(lcl_max = max(Host.no))
+
+lcl2 <- filter(dat_host, Facultative == 'no')%>%
+  select(Parasite.species, Host.no)%>%
+  distinct()%>%
+  group_by(Parasite.species)%>%
+  summarize(lcl_min = n())
+```
+
+```{r}
+lcl <- left_join(lcl, lcl2)
+dat_comb <- left_join(num_hosts, lcl)
+```
+
+We can also add the study effort to the species level data frame, as well as the host specificity index calculated [here](calculate_specificity_index/calc_specificity_patterns.Rmd).
+
+```{r}
+dat_comb <- left_join(dat_comb, dat_study)
+dat_comb <- left_join(dat_comb, dat_hsi)
+rm(lcl, lcl2, num_hosts, num_hosts2)
+```
+
+We can examine the correlation matrix for host range, life cycle length, and study effort. These are a little misleading, because some of these variables are skewed with multiplicative errors, i.e. they need to be log transformed.
+
+```{r}
+round(cor(select(dat_comb, - Parasite.species), use = "complete.obs"),2)
+```
+
+```{r}
+write.csv(dat_comb, file = "../../data/spp_level_combined.csv", row.names = FALSE)
+```
+
+
+# Preliminary modelling
+
+For exploratory purposes, we can fit some simple linear regressions. We need to fit phylogenetic regressions. The simple approach is to fit a base model with study effort, since it is known to affect host range, then we add life cycle length to see if it explains additional variation. We'll start with models for host range from just the LCDB.
+
+Study effort is positively correlated with host range, as expected.
+
+```{r}
+m0 <- lm(log10(num_hosts_lcdb) ~ log(pubs_pubmed_spname_group+1), data = dat_comb)
+summary(m0)
+```
+
+Adding either max or min life cycle length to the regression is a significant improvement, though perhaps moreso for max lcl.
+
+```{r}
+m1max <- lm(log10(num_hosts_lcdb) ~ log(pubs_pubmed_spname_group+1) + lcl_max, data = dat_comb)
+m1min <- lm(log10(num_hosts_lcdb) ~ log(pubs_pubmed_spname_group+1) + lcl_min, data = dat_comb)
+summary(m1max)
+summary(m1min)
+```
+
+When we look at a model with both measures of life cycle length, we find that only max life cycle is significant. So species with facultative life cycles (i.e. a different min lcl than max lcl) do not clearly have a different host range.
+
+```{r}
+m2 <- lm(log10(num_hosts_lcdb) ~ log(pubs_pubmed_spname_group+1) + lcl_max + lcl_min, data = dat_comb)
+summary(m2)
+```
+
+The residual plot looks pretty reasonable.
+
+```{r}
+plot(m2, 1)
+```
+
+Here is a plot that summarizes the model results. Given a certain level of study effort, host range is larger for species with longer life cycles.
+
+```{r}
+ggplot(dat_comb, aes(x = pubs_pubmed_spname_group+1, y = num_hosts_lcdb, color = factor(lcl_max))) + 
+  geom_point(alpha = 0.3) + geom_smooth(method = 'lm') +
+  scale_y_log10() + scale_x_log10()
+```
+
+
+Now we will repeat this modelling exercise, but with host range calculated from the combined LCDB and NHM data.
+
+The relationship between host range and study effort is clearer now, which shows how my LCDB was not exhaustive.
+
+```{r}
+m0 <- lm(log10(num_hosts_lcdb_nhm) ~ log(pubs_pubmed_spname_group+1), data = dat_comb)
+summary(m0)
+```
+
+When we add either life cycle length variable separately, they are significant.
+
+```{r}
+m1max <- lm(log10(num_hosts_lcdb_nhm) ~ log(pubs_pubmed_spname_group+1) + lcl_max, data = dat_comb)
+m1min <- lm(log10(num_hosts_lcdb_nhm) ~ log(pubs_pubmed_spname_group+1) + lcl_min, data = dat_comb)
+summary(m1max)
+summary(m1min)
+```
+
+But again, when both are added simultaneously, the min lcl is not significant.
+
+```{r}
+m2 <- lm(log10(num_hosts_lcdb_nhm) ~ log(pubs_pubmed_spname_group+1) + lcl_max + lcl_min, data = dat_comb)
+summary(m2)
+```
+
+It is worth noting that the parameter estimate is comparable with the two host range measures, 0.27 for the LCDB-only models vs 0.22 for the LCDB-NHM models.
+
+Here is the plot showing the results.
+
+```{r}
+ggplot(dat_comb, aes(x = pubs_pubmed_spname_group+1, y = num_hosts_lcdb_nhm, color = factor(lcl_max))) + 
+  geom_point(alpha = 0.3) + geom_smooth(method = 'lm') +
+  scale_y_log10() + scale_x_log10()
+```
+
+Next step is to repeat the analyses accounting for parasite phylogeny. As a minor step in that direction, here is the above plot separated by parasite group. Happily, the pattern appears quite similar in each group.
+
+```{r}
+dat_comb <- left_join(dat_comb, select(dat_host, Parasite.species, Parasite.group)%>%distinct())
+```
+
+```{r}
+ggplot(dat_comb, aes(x = pubs_pubmed_spname_group+1, y = num_hosts_lcdb_nhm, color = factor(lcl_max))) + 
+  geom_point(alpha = 0.3) + geom_smooth(method = 'lm') +
+  scale_y_log10() + scale_x_log10() +
+  facet_wrap(~Parasite.group)
+```
+
