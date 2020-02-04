@@ -146,9 +146,14 @@ hosts_per_stage <- left_join(hosts_per_stage, select(sp_level, Parasite.species,
 
 ```{r, message=FALSE, warning=FALSE}
 host.tax <- read.csv(file = "../../data/ncbi_host_taxonomy.csv", header = TRUE)
+# some host taxonomy was missing for ~180 spp in LCDB, so I manually filled it
+not_ncbi_tax <- read.csv(file = "../../data/host_tax_manually_filled.csv", header = TRUE)
+# make a single host tax ds
+host.tax2 <- select(host.tax, sp.query, genus, family, order, class, phylum)
+host.tax2 <- bind_rows(host.tax2, select(not_ncbi_tax, sp.query = binomial, genus, family, order, class, phylum))%>%distinct()
 
 lcdb <- left_join(lcdb, 
-                   select(host.tax, sp.query, host_genus = genus, host_family = family, host_order = order, host_class = class, host_phylum = phylum)%>%distinct(),
+                   select(host.tax2, sp.query, host_genus = genus, host_family = family, host_order = order, host_class = class, host_phylum = phylum)%>%distinct(),
                    by = c("best_host_name" = "sp.query"))
 ```
 
