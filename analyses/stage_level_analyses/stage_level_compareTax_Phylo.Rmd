@@ -142,8 +142,8 @@ sx1 <- ggplot(df_comp, aes(x = tax_post.mean, y = phy_post.mean)) +
   annotate('text', label = "(a)", x = min(df_comp$tax_l.95..CI), y = max(df_comp$phy_u.95..CI)) +
   theme(panel.grid.minor = element_blank())
 sx1
-ggsave(sx1, filename = "../../figs/FigSXa.svg", device = 'svg', width = 4.5, height = 4.5)
-ggsave(sx1, filename = "../../figs/FigSXa.png", device = 'png', width = 4.5, height = 4.5)
+ggsave(sx1, filename = "../../figs/FigS1a.svg", device = 'svg', width = 4.5, height = 4.5)
+ggsave(sx1, filename = "../../figs/FigS1a.png", device = 'png', width = 4.5, height = 4.5)
 ```
 
 Here's the Pearson correlation:
@@ -237,8 +237,8 @@ sx2 <- ggplot(df_comp, aes(x = tax_post.mean, y = phy_post.mean)) +
   annotate('text', label = "(b)", x = min(df_comp$tax_l.95..CI), y = max(df_comp$phy_u.95..CI)) +
   theme(panel.grid.minor = element_blank())
 sx2
-ggsave(sx2, filename = "../../figs/FigSXb.svg", device = 'svg', width = 4.5, height = 4.5)
-ggsave(sx2, filename = "../../figs/FigSXb.png", device = 'png', width = 4.5, height = 4.5)
+ggsave(sx2, filename = "../../figs/FigS1b.svg", device = 'svg', width = 4.5, height = 4.5)
+ggsave(sx2, filename = "../../figs/FigS1b.png", device = 'png', width = 4.5, height = 4.5)
 ```
 
 Here's the Pearson correlation:

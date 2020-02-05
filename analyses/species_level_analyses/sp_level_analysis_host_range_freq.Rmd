@@ -560,7 +560,7 @@ sya <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
   guides(color = FALSE) +
   scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5))
 sya
-ggsave(sya, filename = "../../figs/FigSYa.svg", device = 'svg', width = 4.5, height = 4.5)
+ggsave(sya, filename = "../../figs/FigS2a.svg", device = 'svg', width = 4.5, height = 4.5)
 ```
 
 So to understand what drives the taxonomic effect in the model, let's look at families. We'll take the random effect estimates for parasite family from the model accounting for study effort and life cycle length. Then, we'll sort them to see which families rank high (generalists) or low (specialists). 

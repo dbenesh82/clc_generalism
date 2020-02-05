@@ -512,8 +512,8 @@ syd <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
         legend.text = element_text(size = 10),
         panel.grid.minor = element_blank())
 syd
-# ggsave(syd, filename = "../../figs/FigSYd.png", device = 'png', width = 4.5, height = 4.5)
-ggsave(syd, filename = "../../figs/FigSYd.svg", device = 'svg', width = 4.5, height = 4.5)
+# ggsave(syd, filename = "../../figs/FigS2d.png", device = 'png', width = 4.5, height = 4.5)
+ggsave(syd, filename = "../../figs/FigS2d.svg", device = 'svg', width = 4.5, height = 4.5)
 ```
 
 We'll look at worm families to try and understand the taxonomic effects in the model, not because it appears especially important, but rather because it is the intermediate taxonomic level and thus balances the number of groups with the sample size within groups. We'll take the random effect estimates for parasite family from the model accounting for study effort, stage number, and stage function. Then, we'll sort them to see which families rank high (generalists) or low (specialists). 

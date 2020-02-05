@@ -580,8 +580,8 @@ syc <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
   theme(panel.grid.minor = element_blank()) +
   guides(color = FALSE)
 syc
-# ggsave(syc, filename = "../../figs/FigSYc.png", device = 'png', width = 4.5, height = 4.5)
-ggsave(syc, filename = "../../figs/FigSYc.svg", device = 'svg', width = 4.5, height = 4.5)
+# ggsave(syc, filename = "../../figs/FigS2c.png", device = 'png', width = 4.5, height = 4.5)
+ggsave(syc, filename = "../../figs/FigS2c.svg", device = 'svg', width = 4.5, height = 4.5)
 ```
 
 So to understand what causes the taxonomic effect in the model, let's look at families. We'll take the random effect estimates for parasite family from the model accounting for study effort, stage number, and stage function. Then, we'll sort them to see which families rank high (generalists) or low (specialists). 
@@ -695,7 +695,7 @@ sx <- ggplot(filter(hosts_per_stage, parasite_family %in% rx$family[1:12], Facul
   facet_wrap(~parasite_family) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank())
-ggsave(sx, filename = "../../figs/FigSZ.png", device = 'png', width = 7, height = 7)
+ggsave(sx, filename = "../../figs/FigS3.png", device = 'png', width = 7, height = 7)
 ```
 
 Similarly, when we make the same plot for the 12 most specialized families according to the model, we see that some stages infect far fewer hosts than expected. Some stages, though, are as generalist as expected, which suggests that taxa differ because particular stages are more or less generalist than expected, not necessarily because the taxon is consistently generalist (or specialists) across the full life cycle.
