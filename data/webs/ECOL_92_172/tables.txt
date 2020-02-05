@@ -1,0 +1,19 @@
+<html>
+  <head>
+    <title>Ecological Archives E000-000-metadata</title>
+	<style type="text/css">
+		body { font-family: Times New Roman, Times, serif; }
+		#links	{ text-align: center; font-size: .7em; font-family: Arial, Helvetica, sans-serif; }
+	</style>
+  </head>
+  <body>
+    <center>
+      <b><i>Ecological Archives</i> E000-000-D1</b>
+    </center>
+    <p>
+      <b>David W. Thieltges, Karsten Reise, Kim. N. Mouritsen, John P. McLaughlin, and Robert Poulin. Year. Food web including metazoan parasites for a tidal basin in Germany/Denmark. <i>Ecology</i> VOL:PP.</b>
+    </p>
+    <hr>
+	
+  </body>
+</html>

@@ -6,7 +6,7 @@ Parasitic worms with complex life cycles like tapeworms, flukes, nematodes and a
 
 # Data
 
-The main data source for this study is a [database](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecy.1680) I published on the life cycles of parasitic worms. To that, I added data from a large set of [host-parasite records](https://www.nhm.ac.uk/research-curation/scientific-resources/taxonomy-systematics/host-parasites/) maintained by the Natural History Museum in London. Taxonomic information was obtained from [NCBI taxonomy](https://www.ncbi.nlm.nih.gov/taxonomy) and the [Open Tree of Life](https://tree.opentreeoflife.org/). Finally, food webs, which were used for simulating parasite life cycles, were obtained mainly from a [large compilation of webs](https://www.nature.com/articles/s41559-019-0899-x).
+The main data source for this study is a [database](https://esajournals.onlinelibrary.wiley.com/doi/full/10.1002/ecy.1680) I published on the life cycles of parasitic worms. To that, I added data from a large set of [host-parasite records](https://www.nhm.ac.uk/research-curation/scientific-resources/taxonomy-systematics/host-parasites/) maintained by the Natural History Museum in London. Taxonomic information was obtained from [NCBI taxonomy](https://www.ncbi.nlm.nih.gov/taxonomy) and the [Open Tree of Life](https://tree.opentreeoflife.org/). Finally, food webs, which were used for simulating parasite life cycles, were obtained mainly from a [large compilation of webs](https://www.nature.com/articles/s41559-019-0899-x) as well as several other [published webs](data/webs).
 
 # Analyses
 
@@ -34,7 +34,7 @@ our analysis demonstrates how food webs determine potential host ranges and it s
 
 ## Costs of generalism
 
-At the parasite stage level, we assessed tradeoffs between generalism and two life history traits, growth and development time. We found that parasite stages that spend less time developing and grow less in their host tended to infect a more taxonomically broad set of hosts. This is consistent with a tradeoff between generalism and parasite growth. 
+At the parasite stage level, we assessed tradeoffs between generalism and two life history traits, growth and development time. The analyses are [here](analyses/tradeoffs_w_growth/growth_TO_host_range.md) and [here](analyses/tradeoffs_w_growth/growth_TO_tax_dissim.md) We found that parasite stages that spend less time developing and grow less in their host tended to infect a more taxonomically broad set of hosts. This is consistent with a tradeoff between generalism and parasite growth. 
 
 ![](figs/Fig5_comb.png)
 

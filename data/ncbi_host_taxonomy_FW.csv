@@ -1,0 +1,185 @@
+i.vec,sp.query,q.rank,ncbi.ids,class,cohort,family,genus,infraclass,infraorder,kingdom,order,phylum,species,species group,subclass,subfamily,subgenus,subkingdom,suborder,subphylum,subtribe,superclass,superfamily,superkingdom,superorder,tribe
+4,Aedes taeniorhynchus,genus,7158,Insecta,Holometabola,Culicidae,Aedes,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,NA,NA,Pterygota,Culicinae,NA,NA,Nematocera,Hexapoda,NA,NA,Culicoidea,Eukaryota,NA,Aedini
+29,Asterina phylactica,species,195879,Asteroidea,NA,Asterinidae,Asterina,NA,NA,Metazoa,Valvatida,Echinodermata,Asterina phylactica,NA,NA,NA,NA,NA,NA,NA,NA,Asterozoa,NA,Eukaryota,Valvatacea,NA
+35,Austrosimulium australense,genus,27462,Insecta,Holometabola,Simuliidae,Austrosimulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,NA,NA,Pterygota,Simuliinae,NA,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+36,Austrosimulium australense ,genus,27462,Insecta,Holometabola,Simuliidae,Austrosimulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,NA,NA,Pterygota,Simuliinae,NA,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+50,Calamus bajonado,species,1469962,Actinopteri,Euteleosteomorpha,Sparidae,Calamus,Teleostei,NA,Metazoa,Spariformes,Chordata,Calamus bajonado,NA,Neopterygii,NA,NA,NA,NA,Craniata,NA,Actinopterygii,NA,Eukaryota,NA,NA
+51,Calamus calamus,species,490251,Actinopteri,Euteleosteomorpha,Sparidae,Calamus,Teleostei,NA,Metazoa,Spariformes,Chordata,Calamus calamus,NA,Neopterygii,NA,NA,NA,NA,Craniata,NA,Actinopterygii,NA,Eukaryota,NA,NA
+52,Calamus pennatula,species,1930818,Actinopteri,Euteleosteomorpha,Sparidae,Calamus,Teleostei,NA,Metazoa,Spariformes,Chordata,Calamus pennatula,NA,Neopterygii,NA,NA,NA,NA,Craniata,NA,Actinopterygii,NA,Eukaryota,NA,NA
+66,Charybdis natator,species,243326,Malacostraca,NA,Portunidae,Charybdis,NA,Brachyura,Metazoa,Decapoda,Arthropoda,Charybdis natator,NA,Eumalacostraca,NA,NA,NA,Pleocyemata,Crustacea,NA,Multicrustacea,Portunoidea,Eukaryota,Eucarida,NA
+71,Clevelandia ios,species,185732,Actinopteri,Euteleosteomorpha,Gobiidae,Clevelandia,Teleostei,NA,Metazoa,Gobiiformes,Chordata,Clevelandia ios,NA,Neopterygii,Gobionellinae,NA,NA,Gobioidei,Craniata,NA,Actinopterygii,NA,Eukaryota,NA,NA
+77,Conus ebraeus,species,89425,Gastropoda,NA,Conidae,Conus,NA,NA,Metazoa,Neogastropoda,Mollusca,Conus ebraeus,NA,Caenogastropoda,NA,Virroconus,NA,NA,NA,NA,NA,Conoidea,Eukaryota,NA,NA
+78,Conus tinianus,species,909294,Gastropoda,NA,Conidae,Conus,NA,NA,Metazoa,Neogastropoda,Mollusca,Conus tinianus,NA,Caenogastropoda,NA,Floraconus,NA,NA,NA,NA,NA,Conoidea,Eukaryota,NA,NA
+81,Corella eumyota,species,431183,Ascidiacea,NA,Corellidae,Corella,NA,NA,Metazoa,Enterogona,Chordata,Corella eumyota,NA,NA,NA,NA,NA,Phlebobranchia,Tunicata,NA,NA,NA,Eukaryota,NA,NA
+84,Crematogaster ashmeadi,genus,29040,Insecta,Holometabola,Formicidae,Crematogaster,Neoptera,Aculeata,Metazoa,Hymenoptera,Arthropoda,NA,NA,Pterygota,Myrmicinae,NA,NA,Apocrita,Hexapoda,NA,NA,Formicoidea,Eukaryota,NA,Crematogastrini
+89,Cyanea capillata,species,27804,Scyphozoa,NA,Cyaneidae,Cyanea,NA,NA,Metazoa,Semaeostomeae,Cnidaria,Cyanea capillata,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+96,Diplosoma modestum,genus,168634,Ascidiacea,NA,Didemnidae,Diplosoma,NA,NA,Metazoa,Enterogona,Chordata,NA,NA,NA,NA,NA,NA,Aplousobranchia,Tunicata,NA,NA,NA,Eukaryota,NA,NA
+100,Dugesia tigrina,genus,6160,Rhabditophora,NA,Dugesiidae,Dugesia,NA,NA,Metazoa,Tricladida,Platyhelminthes,NA,NA,NA,NA,NA,NA,Continenticola,NA,NA,NA,Geoplanoidea,Eukaryota,NA,NA
+118,Eulalia virdis,genus,251454,Polychaeta,NA,Phyllodocidae,Eulalia,Aciculata,NA,Metazoa,Phyllodocida,Annelida,NA,NA,Palpata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+123,Fridericia alata,genus,77730,Clitellata,NA,Enchytraeidae,Fridericia,NA,NA,Metazoa,Enchytraeida,Annelida,NA,NA,Oligochaeta,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+124,Fridericia bisetosa,species,188774,Clitellata,NA,Enchytraeidae,Fridericia,NA,NA,Metazoa,Enchytraeida,Annelida,Fridericia bisetosa,NA,Oligochaeta,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+125,Fridericia bulboides,species,913648,Clitellata,NA,Enchytraeidae,Fridericia,NA,NA,Metazoa,Enchytraeida,Annelida,Fridericia bulboides,NA,Oligochaeta,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+126,Fridericia cylindrica,genus,77730,Clitellata,NA,Enchytraeidae,Fridericia,NA,NA,Metazoa,Enchytraeida,Annelida,NA,NA,Oligochaeta,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+127,Fridericia hegemon,species,2135382,Clitellata,NA,Enchytraeidae,Fridericia,NA,NA,Metazoa,Enchytraeida,Annelida,Fridericia hegemon,NA,Oligochaeta,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+128,Fridericia paroniana,species,913656,Clitellata,NA,Enchytraeidae,Fridericia,NA,NA,Metazoa,Enchytraeida,Annelida,Fridericia paroniana,NA,Oligochaeta,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+129,Fridericia perrieri,species,913657,Clitellata,NA,Enchytraeidae,Fridericia,NA,NA,Metazoa,Enchytraeida,Annelida,Fridericia perrieri,NA,Oligochaeta,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+130,Fritillaria borealis,species,2507563,Appendicularia,NA,Fritillariidae,Fritillaria,NA,NA,Metazoa,Copelata,Chordata,Fritillaria borealis,NA,NA,NA,NA,NA,NA,Tunicata,NA,NA,NA,Eukaryota,NA,NA
+146,Haplothrips flavipes,genus,450987,Insecta,Paraneoptera,Phlaeothripidae,Haplothrips,Neoptera,NA,Metazoa,Thysanoptera,Arthropoda,NA,NA,Pterygota,Phlaeothripinae,NA,NA,Tubulifera,Hexapoda,NA,NA,Phlaeothripoidea,Eukaryota,NA,NA
+147,Haplothrips sp,genus,450987,Insecta,Paraneoptera,Phlaeothripidae,Haplothrips,Neoptera,NA,Metazoa,Thysanoptera,Arthropoda,NA,NA,Pterygota,Phlaeothripinae,NA,NA,Tubulifera,Hexapoda,NA,NA,Phlaeothripoidea,Eukaryota,NA,NA
+151,Hermannia gibba,species,229873,Arachnida,NA,Hermanniidae,Hermannia,NA,Desmonomata,Metazoa,Sarcoptiformes,Arthropoda,Hermannia gibba,NA,Acari,NA,NA,NA,Oribatida,Chelicerata,NA,NA,Hermannioidea,Eukaryota,Acariformes,NA
+174,Isotoma cf viridis (juv),genus,57735,Collembola,NA,Isotomidae,Isotoma,NA,NA,Metazoa,Entomobryomorpha,Arthropoda,NA,NA,NA,Isotominae,NA,NA,NA,Hexapoda,NA,NA,Isotomoidea,Eukaryota,NA,NA
+175,Isotoma hiemalis,genus,57735,Collembola,NA,Isotomidae,Isotoma,NA,NA,Metazoa,Entomobryomorpha,Arthropoda,NA,NA,NA,Isotominae,NA,NA,NA,Hexapoda,NA,NA,Isotomoidea,Eukaryota,NA,NA
+189,Leptochiton algesirensis,species,993581,Polyplacophora,NA,Lepidopleuridae,Leptochiton,NA,NA,Metazoa,Lepidopleurida,Mollusca,Leptochiton algesirensis,NA,Neoloricata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+195,Leucothoe incisa,species,1920385,Malacostraca,NA,Leucothoidae,Leucothoe,NA,NA,Metazoa,Amphipoda,Arthropoda,Leucothoe incisa,NA,Eumalacostraca,NA,NA,NA,Gammaridea,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+196,Leucothoe lilljeborgi,species,1818033,Malacostraca,NA,Leucothoidae,Leucothoe,NA,NA,Metazoa,Amphipoda,Arthropoda,Leucothoe lilljeborgi,NA,Eumalacostraca,NA,NA,NA,Gammaridea,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+197,Limacia clavigeria,genus,71318,Gastropoda,NA,Polyceridae,Limacia,NA,Doridina,Metazoa,Nudibranchia,Mollusca,NA,NA,Heterobranchia,NA,NA,NA,NA,NA,NA,NA,Anadoridoidea,Eukaryota,Nudipleura,NA
+199,Liriope tetraphylla,species,37524,Hydrozoa,NA,Geryoniidae,Liriope,NA,NA,Metazoa,Trachymedusae,Cnidaria,Liriope tetraphylla,NA,Trachylinae,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+208,Mertensia ovum,species,140496,Tentaculata,NA,Mertensiidae,Mertensia,NA,NA,Metazoa,Cydippida,Ctenophora,Mertensia ovum,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+217,Nemastoma bimaculatum,species,121211,Arachnida,NA,Nemastomatidae,Nemastoma,NA,NA,Metazoa,Opiliones,Arthropoda,Nemastoma bimaculatum,NA,NA,NA,NA,NA,Palpatores,Chelicerata,NA,NA,Troguloidea,Eukaryota,NA,NA
+229,Neurotmeta breviceps,genus,2650856,Insecta,Paraneoptera,Tropiduchidae,Neurotmeta,Neoptera,Fulgoromorpha,Metazoa,Hemiptera,Arthropoda,NA,NA,Pterygota,NA,NA,NA,Auchenorrhyncha,Hexapoda,NA,NA,Fulgoroidea,Eukaryota,NA,NA
+235,Olfersia sordida,genus,1333310,Insecta,Holometabola,Hippoboscidae,Olfersia,Neoptera,Muscomorpha,Metazoa,Diptera,Arthropoda,NA,NA,Pterygota,Ornithomyinae,NA,NA,Brachycera,Hexapoda,NA,NA,Hippoboscoidea,Eukaryota,NA,NA
+250,Pandora glacialis,species,1622214,Bivalvia,NA,Pandoridae,Pandora,NA,NA,Metazoa,Pholadomyoida,Mollusca,Pandora glacialis,NA,Anomalodesmata,NA,NA,NA,NA,NA,NA,NA,Pandoroidea,Eukaryota,NA,NA
+251,Pandora gouldiana,genus,120446,Bivalvia,NA,Pandoridae,Pandora,NA,NA,Metazoa,Pholadomyoida,Mollusca,NA,NA,Anomalodesmata,NA,NA,NA,NA,NA,NA,NA,Pandoroidea,Eukaryota,NA,NA
+254,Paralimnophora skusei,genus,2611102,Insecta,Holometabola,Muscidae,Paralimnophora,Neoptera,Muscomorpha,Metazoa,Diptera,Arthropoda,NA,NA,Pterygota,Coenosiinae,NA,NA,Brachycera,Hexapoda,NA,NA,Muscoidea,Eukaryota,NA,Limnophorini
+260,Pectinaria gouldii,species,260746,Polychaeta,NA,Pectinariidae,Pectinaria,NA,NA,Metazoa,Terebellida,Annelida,Pectinaria gouldii,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+270,Plasmodium sp.,species,31272,Aconoidasida,NA,Plasmodiidae,Plasmodium,NA,NA,NA,Haemosporida,Apicomplexa,Plasmodium sp.,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+278,Polydora aggregata,genus,46600,Polychaeta,NA,Spionidae,Polydora,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+279,Polydora cilliata,genus,46600,Polychaeta,NA,Spionidae,Polydora,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+280,Polydora cornuta,species,438488,Polychaeta,NA,Spionidae,Polydora,NA,NA,Metazoa,Spionida,Annelida,Polydora cornuta,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+281,Polydora ligni,genus,46600,Polychaeta,NA,Spionidae,Polydora,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+282,Polydora nuchalis,genus,46600,Polychaeta,NA,Spionidae,Polydora,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+283,Polydora sp.,genus,46600,Polychaeta,NA,Spionidae,Polydora,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+284,Polydora websteri,species,1167209,Polychaeta,NA,Spionidae,Polydora,NA,NA,Metazoa,Spionida,Annelida,Polydora websteri,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+320,Sida crystallina,species,77656,Branchiopoda,NA,Sididae,Sida,NA,Ctenopoda,Metazoa,Diplostraca,Arthropoda,Sida crystallina,NA,Phyllopoda,NA,NA,NA,Cladocera,Crustacea,NA,NA,NA,Eukaryota,NA,NA
+321,Silicularia rosea,species,314502,Hydrozoa,NA,Campanulariidae,Silicularia,NA,NA,Metazoa,Leptothecata,Cnidaria,Silicularia rosea,NA,Hydroidolina,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+322,Simulium aureum,species,630741,Insecta,Holometabola,Simuliidae,Simulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,Simulium aureum,NA,Pterygota,Simuliinae,Eusimulium,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+323,Simulium equinum,species,697245,Insecta,Holometabola,Simuliidae,Simulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,Simulium equinum,NA,Pterygota,Simuliinae,Wilhelmia,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+324,Simulium erythrocephalum,species,1206071,Insecta,Holometabola,Simuliidae,Simulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,Simulium erythrocephalum,NA,Pterygota,Simuliinae,Boophthora,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+325,Simulium intermedium,species,502684,Insecta,Holometabola,Simuliidae,Simulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,Simulium intermedium,ornatum group,Pterygota,Simuliinae,Simulium,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+326,Simulium lundstromi,species,1117005,Insecta,Holometabola,Simuliidae,Simulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,Simulium lundstromi,NA,Pterygota,Simuliinae,Nevermannia,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+327,Simulium vittatum,species,7192,Insecta,Holometabola,Simuliidae,Simulium,Neoptera,Culicomorpha,Metazoa,Diptera,Arthropoda,Simulium vittatum,NA,Pterygota,Simuliinae,Psilozia,NA,Nematocera,Hexapoda,NA,NA,Chironomoidea,Eukaryota,NA,Simuliini
+347,Tetilla leptoderma,species,885872,Demospongiae,NA,Tetillidae,Tetilla,NA,NA,Metazoa,Tetractinellida,Porifera,Tetilla leptoderma,NA,Heteroscleromorpha,NA,NA,NA,Spirophorina,NA,NA,NA,NA,Eukaryota,NA,NA
+350,Trichodina sp.,species,2070542,Oligohymenophorea,NA,Trichodinidae,Trichodina,NA,NA,NA,Mobilida,Ciliophora,Trichodina sp.,NA,Peritrichia,NA,NA,NA,NA,Intramacronucleata,NA,NA,NA,Eukaryota,NA,NA
+354,Tritonia antarctica,species,797240,Gastropoda,NA,Tritoniidae,Tritonia,NA,NA,Metazoa,Nudibranchia,Mollusca,Tritonia antarctica,NA,Heterobranchia,NA,NA,NA,Cladobranchia,NA,NA,NA,Dendronotoidea,Eukaryota,Nudipleura,NA
+1,Abarenicola affinis,species,273053,Polychaeta,NA,Arenicolidae,Abarenicola,NA,NA,Metazoa,Capitellida,Annelida,Abarenicola affinis,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+2,Acanthostomum balthicum,genus,1333676,Trematoda,NA,Cryptogonimidae,Acanthostomum,NA,NA,Metazoa,Opisthorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Opisthorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+8,Alaria ,genus,138589,Trematoda,NA,Diplostomidae,Alaria,NA,NA,Metazoa,Strigeidida,Platyhelminthes,NA,NA,Digenea,Alariinae,NA,NA,NA,NA,NA,NA,Diplostomoidea,Eukaryota,NA,NA
+8,Alaria ,genus,2888,Phaeophyceae,NA,Alariaceae,Alaria,NA,NA,NA,Laminariales,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+9,Alcyonidium mytili,genus,51986,Gymnolaemata,NA,Alcyonidiidae,Alcyonidium,NA,NA,Metazoa,Ctenostomatida,Bryozoa,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+18,Amphiporus lactifloreus,species,187594,Enopla,NA,Amphiporidae,Amphiporus,NA,NA,Metazoa,Monostilifera,Nemertea,Amphiporus lactifloreus,NA,Hoplonemertea,NA,NA,NA,Eumonostilifera,NA,NA,NA,NA,Eukaryota,NA,NA
+20,Anisakis simplex,species,6269,Chromadorea,NA,Anisakidae,Anisakis,NA,Ascaridomorpha,Metazoa,Rhabditida,Nematoda,Anisakis simplex,NA,NA,NA,NA,NA,Spirurina,NA,NA,NA,Ascaridoidea,Eukaryota,NA,NA
+25,Aonides sp. 1,genus,195208,Polychaeta,NA,Spionidae,Aonides,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+26,Aora sp.,genus,371455,Malacostraca,NA,Aoridae,Aora,NA,Corophiida,Metazoa,Amphipoda,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,Senticaudata,Crustacea,NA,Multicrustacea,Corophioidea,Eukaryota,Peracarida,NA
+28,Aphalloides timmi,genus,1483948,Trematoda,NA,Cryptogonimidae,Aphalloides,NA,NA,Metazoa,Opisthorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Opisthorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+35,Arenicola  marina,genus,6343,Polychaeta,NA,Arenicolidae,Arenicola,NA,NA,Metazoa,Capitellida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+36,Armandia sp.,genus,167807,Polychaeta,NA,Opheliidae,Armandia,NA,NA,Metazoa,Scolecida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+37,Arrenurus ,genus,768087,Arachnida,NA,Arrenuridae,Arrenurus,NA,Anystina,Metazoa,Trombidiformes,Arthropoda,NA,NA,Acari,NA,NA,NA,Prostigmata,Chelicerata,NA,NA,Arrenuroidea,Eukaryota,Acariformes,NA
+39,Asymphylodora demeli,genus,986157,Trematoda,NA,Lissorchiidae,Asymphylodora,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Monorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+46,Austrovenus stutchburyi,species,98293,Bivalvia,NA,Veneridae,Austrovenus,Euheterodonta,NA,Metazoa,Veneroida,Mollusca,Austrovenus stutchburyi,NA,Heterodonta,NA,NA,NA,NA,NA,NA,NA,Veneroidea,Eukaryota,NA,NA
+54,Belostoma ,genus,236415,Insecta,Paraneoptera,Belostomatidae,Belostoma,Neoptera,Nepomorpha,Metazoa,Hemiptera,Arthropoda,NA,NA,Pterygota,Belostomatinae,NA,NA,Heteroptera,Hexapoda,NA,NA,NA,Eukaryota,NA,NA
+56,Boccardia acus,species,1231925,Polychaeta,NA,Spionidae,Boccardia,NA,NA,Metazoa,Spionida,Annelida,Boccardia acus,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+57,Boccardia syrtis,species,1231927,Polychaeta,NA,Spionidae,Boccardia,NA,NA,Metazoa,Spionida,Annelida,Boccardia syrtis,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+62,Bothriocephalus scorpii,species,56203,Cestoda,NA,Bothriocephalidae,Bothriocephalus,NA,NA,Metazoa,Bothriocephalidea,Platyhelminthes,Bothriocephalus scorpii,NA,Eucestoda,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+65,Brachyphallus crenatus,species,1807725,Trematoda,NA,Hemiuridae,Brachyphallus,NA,NA,Metazoa,Azygiida,Platyhelminthes,Brachyphallus crenatus,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,Hemiuroidea,Eukaryota,NA,NA
+66,Bulla gouldiana,species,114738,Gastropoda,NA,Bullidae,Bulla,NA,NA,Metazoa,Cephalaspidea,Mollusca,Bulla gouldiana,NA,Heterobranchia,NA,NA,NA,NA,NA,NA,NA,Bulloidea,Eukaryota,NA,NA
+67,Bunocotyle cingulata,genus,368072,Trematoda,NA,Hemiuridae,Bunocotyle,NA,NA,Metazoa,Azygiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,Hemiuroidea,Eukaryota,NA,NA
+71,Capillaria sp.,genus,119095,Enoplea,NA,Capillariidae,Capillaria,NA,NA,Metazoa,Trichinellida,Nematoda,NA,NA,Dorylaimia,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+72,Carcinus  maenas,genus,6758,Malacostraca,NA,Carcinidae,Carcinus,NA,Brachyura,Metazoa,Decapoda,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,Pleocyemata,Crustacea,NA,Multicrustacea,Portunoidea,Eukaryota,Eucarida,NA
+80,Cephalogonimus americanus,species,913093,Trematoda,NA,Cephalogonimidae,Cephalogonimus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Cephalogonimus americanus,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Plagiorchioidea,Eukaryota,NA,NA
+82,Cerastoderma  edule,genus,55709,Bivalvia,NA,Cardiidae,Cerastoderma,Euheterodonta,NA,Metazoa,Veneroida,Mollusca,NA,NA,Heterodonta,NA,NA,NA,NA,NA,NA,NA,Cardioidea,Eukaryota,NA,NA
+85,Cercaria ephemera,genus,280692,Trematoda,NA,NA,Cercaria,NA,NA,Metazoa,Digenea,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+86,Cercaria microphallidarum no. 4,genus,280692,Trematoda,NA,NA,Cercaria,NA,NA,Metazoa,Digenea,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+87,Chaetogammarus marinus,species,315579,Malacostraca,NA,Gammaridae,Chaetogammarus,NA,Gammarida,Metazoa,Amphipoda,Arthropoda,Chaetogammarus marinus,NA,Eumalacostraca,NA,NA,NA,Senticaudata,Crustacea,NA,Multicrustacea,Gammaroidea,Eukaryota,Peracarida,NA
+94,Ciliata  mustela,genus,210569,Actinopteri,Euteleosteomorpha,Gaidropsaridae,Ciliata,Teleostei,NA,Metazoa,Gadiformes,Chordata,NA,NA,Neopterygii,NA,NA,NA,Gadoidei,Craniata,NA,Actinopterygii,NA,Eukaryota,NA,NA
+95,Cirriformia spirabrancha,genus,279645,Polychaeta,NA,Cirratulidae,Cirriformia,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+98,Colurostylis lemurum,genus,199713,Malacostraca,NA,Diastylidae,Colurostylis,NA,NA,Metazoa,Cumacea,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+102,Contracaecum sp.,genus,47567,Chromadorea,NA,Anisakidae,Contracaecum,NA,Ascaridomorpha,Metazoa,Rhabditida,Nematoda,NA,NA,NA,NA,NA,NA,Spirurina,NA,NA,NA,Ascaridoidea,Eukaryota,NA,NA
+108,Corophium  volutator,genus,371471,Malacostraca,NA,Corophiidae,Corophium,NA,Corophiida,Metazoa,Amphipoda,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,Senticaudata,Crustacea,NA,Multicrustacea,Corophioidea,Eukaryota,Peracarida,NA
+113,Cryptocotyle concavum,genus,66765,Trematoda,NA,Heterophyidae,Cryptocotyle,NA,NA,Metazoa,Opisthorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Opisthorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+114,Cryptocotyle jejuna,genus,66765,Trematoda,NA,Heterophyidae,Cryptocotyle,NA,NA,Metazoa,Opisthorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Opisthorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+115,Cryptocotyle lingua,species,66766,Trematoda,NA,Heterophyidae,Cryptocotyle,NA,NA,Metazoa,Opisthorchiida,Platyhelminthes,Cryptocotyle lingua,NA,Digenea,NA,NA,NA,Opisthorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+119,Cucullanus  cirratus,genus,657292,Chromadorea,NA,Cucullanidae,Cucullanus,NA,Ascaridomorpha,Metazoa,Rhabditida,Nematoda,NA,NA,NA,NA,NA,NA,Spirurina,NA,NA,NA,Seuratoidea,Eukaryota,NA,NA
+120,Cumopsis goodsiri,species,94561,Malacostraca,NA,Bodotriidae,Cumopsis,NA,NA,Metazoa,Cumacea,Arthropoda,Cumopsis goodsiri,NA,Eumalacostraca,Vaunthompsoniinae,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+121,Curtuteria australis,species,500588,Trematoda,NA,Himasthlidae,Curtuteria,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Curtuteria australis,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+124,Cymodopsis montis,genus,638703,Malacostraca,NA,Sphaeromatidae,Cymodopsis,NA,NA,Metazoa,Isopoda,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+125,Dactylogyrus sp.,genus,142931,Monogenea,NA,Dactylogyridae,Dactylogyrus,NA,NA,Metazoa,Dactylogyridea,Platyhelminthes,NA,NA,Monopisthocotylea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+126,Daubaylia ,genus,1811522,Chromadorea,NA,Daubayliidae,Daubaylia,NA,Rhabditomorpha,Metazoa,Rhabditida,Nematoda,NA,NA,NA,NA,NA,NA,Rhabditina,NA,NA,NA,Rhabditoidea,Eukaryota,NA,NA
+127,Decamastus sp.,genus,1932350,Polychaeta,NA,Capitellidae,Decamastus,NA,NA,Metazoa,Capitellida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+130,Diastylopsis thileniusi,genus,199723,Malacostraca,NA,Diastylidae,Diastylopsis,NA,NA,Metazoa,Cumacea,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+138,Dorvillea incerta,genus,160441,Polychaeta,NA,Dorvilleidae,Dorvillea,Aciculata,NA,Metazoa,Eunicida,Annelida,NA,NA,Palpata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+140,Echinorhynchus sp.,genus,57285,Palaeacanthocephala,NA,Echinorhynchidae,Echinorhynchus,NA,NA,Metazoa,NA,Acanthocephala,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+141,Echinostoma ,genus,27847,Trematoda,NA,Echinostomatidae,Echinostoma,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+142,Echinostoma trivolvis,species,27849,Trematoda,NA,Echinostomatidae,Echinostoma,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Echinostoma trivolvis,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+144,Edwardsia  leucomelos,genus,51817,Anthozoa,NA,Edwardsiidae,Edwardsia,NA,NA,Metazoa,Actiniaria,Cnidaria,NA,NA,Hexacorallia,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+161,Exogone  sp. 2,genus,199555,Polychaeta,NA,Syllidae,Exogone,Aciculata,NA,Metazoa,Phyllodocida,Annelida,NA,NA,Palpata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+162,Exogone sp. 1,genus,199555,Polychaeta,NA,Syllidae,Exogone,Aciculata,NA,Metazoa,Phyllodocida,Annelida,NA,NA,Palpata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+163,Exogone sp. 3,genus,199555,Polychaeta,NA,Syllidae,Exogone,Aciculata,NA,Metazoa,Phyllodocida,Annelida,NA,NA,Palpata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+164,Exosphaeroma planulum,genus,337069,Malacostraca,NA,Sphaeromatidae,Exosphaeroma,NA,NA,Metazoa,Isopoda,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+170,Gadus  morhua,genus,8048,Actinopteri,Euteleosteomorpha,Gadidae,Gadus,Teleostei,NA,Metazoa,Gadiformes,Chordata,NA,NA,Neopterygii,NA,NA,NA,Gadoidei,Craniata,NA,Actinopterygii,NA,Eukaryota,NA,NA
+172,Galactosomum sp.,genus,232669,Trematoda,NA,Heterophyidae,Galactosomum,NA,NA,Metazoa,Opisthorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Opisthorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+182,Geminosyllis sp.,genus,418321,Polychaeta,NA,Syllidae,Geminosyllis,Aciculata,NA,Metazoa,Phyllodocida,Annelida,NA,NA,Palpata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+185,Glaucus sp.,genus,1154736,Gastropoda,NA,Glaucidae,Glaucus,NA,NA,Metazoa,Nudibranchia,Mollusca,NA,NA,Heterobranchia,NA,NA,NA,Cladobranchia,NA,NA,NA,Aeolidioidea,Eukaryota,Nudipleura,NA
+189,Gymnophallus choledochus,species,1094378,Trematoda,NA,Gymnophallidae,Gymnophallus,NA,NA,Metazoa,Digenea,Platyhelminthes,Gymnophallus choledochus,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+190,Gymnophallus gibberosus,genus,431612,Trematoda,NA,Gymnophallidae,Gymnophallus,NA,NA,Metazoa,Digenea,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+191,Gymnophallus sp. ,genus,431612,Trematoda,NA,Gymnophallidae,Gymnophallus,NA,NA,Metazoa,Digenea,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+192,Gynaecotyla sp.,genus,340111,Trematoda,NA,Microphallidae,Gynaecotyla,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+193,Haematopus  sp. 1,genus,32635,Aves,NA,Haematopodidae,Haematopus,Neognathae,NA,Metazoa,Charadriiformes,Chordata,NA,NA,NA,NA,NA,NA,NA,Craniata,NA,Sarcopterygii,NA,Eukaryota,NA,NA
+194,Haematopus  sp. 2,genus,32635,Aves,NA,Haematopodidae,Haematopus,Neognathae,NA,Metazoa,Charadriiformes,Chordata,NA,NA,NA,NA,NA,NA,NA,Craniata,NA,Sarcopterygii,NA,Eukaryota,NA,NA
+195,Halicarcinus whitei,genus,578596,Malacostraca,NA,Hymenosomatidae,Halicarcinus,NA,Brachyura,Metazoa,Decapoda,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,Pleocyemata,Crustacea,NA,Multicrustacea,Leucosioidea,Eukaryota,Eucarida,NA
+196,Halipegus ,genus,1964308,Trematoda,NA,Derogenidae,Halipegus,NA,NA,Metazoa,Azygiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,Hemiuroidea,Eukaryota,NA,NA
+197,Haliplus ,genus,107852,Insecta,Holometabola,Haliplidae,Haliplus,Neoptera,NA,Metazoa,Coleoptera,Arthropoda,NA,NA,Pterygota,NA,NA,NA,Adephaga,Hexapoda,NA,NA,Haliploidea,Eukaryota,NA,NA
+203,Hemiurus communis,species,73061,Trematoda,NA,Hemiuridae,Hemiurus,NA,NA,Metazoa,Azygiida,Platyhelminthes,Hemiurus communis,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,Hemiuroidea,Eukaryota,NA,NA
+204,Hemiurus luehei,species,382715,Trematoda,NA,Hemiuridae,Hemiurus,NA,NA,Metazoa,Azygiida,Platyhelminthes,Hemiurus luehei,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,Hemiuroidea,Eukaryota,NA,NA
+205,Heterosquilla tricarinata,species,77694,Malacostraca,NA,Heterosquillidae,Heterosquilla,NA,NA,Metazoa,Eumalacostraca,Arthropoda,Heterosquilla tricarinata,NA,Eumalacostraca,NA,NA,NA,Stomatopoda,Crustacea,NA,Multicrustacea,Lysiosquilloidea,Eukaryota,Hoplocarida,NA
+213,Hydractinia echinata,species,35630,Hydrozoa,NA,Hydractiniidae,Hydractinia,NA,NA,Metazoa,Anthoathecata,Cnidaria,Hydractinia echinata,NA,Hydroidolina,NA,NA,NA,Filifera,NA,NA,NA,NA,Eukaryota,NA,NA
+221,Hysterothylacium sp.,genus,59255,Chromadorea,NA,Raphidascarididae,Hysterothylacium,NA,Ascaridomorpha,Metazoa,Rhabditida,Nematoda,NA,NA,NA,NA,NA,NA,Spirurina,NA,NA,NA,Ascaridoidea,Eukaryota,NA,NA
+242,Lecithaster confusus,species,2491884,Trematoda,NA,Lecithasteridae,Lecithaster,NA,NA,Metazoa,Azygiida,Platyhelminthes,Lecithaster confusus,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+250,Lepocreadium ,genus,1429363,Trematoda,NA,Lepocreadiidae,Lepocreadium,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Lepocreadiata,NA,NA,NA,Lepocreadioidea,Eukaryota,NA,NA
+258,Levinseniella brachysoma,genus,116880,Trematoda,NA,Microphallidae,Levinseniella,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+259,Levinseniella sp.,genus,116880,Trematoda,NA,Microphallidae,Levinseniella,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+265,Macoma  balthica,genus,52799,Bivalvia,NA,Tellinidae,Macoma,Euheterodonta,NA,Metazoa,Veneroida,Mollusca,NA,NA,Heterodonta,NA,NA,NA,NA,NA,NA,NA,Tellinoidea,Eukaryota,NA,NA
+269,Magelona mirabilis,species,46598,Polychaeta,NA,Magelonidae,Magelona,NA,NA,Metazoa,Spionida,Annelida,Magelona mirabilis,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+271,Malacoceros sp.,genus,104704,Polychaeta,NA,Spionidae,Malacoceros,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+273,Megalodiscus ,genus,1325193,Trematoda,NA,Paramphistomatidae,Megalodiscus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Pronocephalata,NA,NA,NA,Paramphistomoidea,Eukaryota,NA,NA
+274,Meiogymnophallus minutus,species,1094385,Trematoda,NA,Gymnophallidae,Meiogymnophallus,NA,NA,Metazoa,Digenea,Platyhelminthes,Meiogymnophallus minutus,NA,Digenea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+281,Metridium  senile,genus,6115,Anthozoa,NA,Metridiidae,Metridium,NA,NA,Metazoa,Actiniaria,Cnidaria,NA,NA,Hexacorallia,NA,NA,NA,Nynantheae,NA,NA,NA,NA,Eukaryota,NA,NA
+283,Microcotyle sp.,genus,92221,Monogenea,NA,Microcotylidae,Microcotyle,NA,NA,Metazoa,Mazocraeidea,Platyhelminthes,NA,NA,Polyopisthocotylea,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+284,Microphallus claviformis,genus,116891,Trematoda,NA,Microphallidae,Microphallus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+285,Microphallus papillorobustum,genus,116891,Trematoda,NA,Microphallidae,Microphallus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+286,Microphallus pirum,genus,116891,Trematoda,NA,Microphallidae,Microphallus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+287,Microphallus pygmaeus,species,862625,Trematoda,NA,Microphallidae,Microphallus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Microphallus pygmaeus,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+288,Microphallus sp.,species,1934194,Trematoda,NA,Microphallidae,Microphallus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Microphallus sp.,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Microphalloidea,Eukaryota,NA,NA
+292,Monorchis parvus,species,92686,Trematoda,NA,Monorchiidae,Monorchis,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Monorchis parvus,NA,Digenea,NA,NA,NA,Monorchiata,NA,NA,NA,NA,Eukaryota,NA,NA
+295,Mugil  chelo,genus,8190,Actinopteri,Euteleosteomorpha,Mugilidae,Mugil,Teleostei,NA,Metazoa,Mugiliformes,Chordata,NA,NA,Neopterygii,NA,NA,NA,NA,Craniata,NA,Actinopterygii,NA,Eukaryota,NA,NA
+297,Mytilicola intestinalis,species,298439,Hexanauplia,NA,Mytilicolidae,Mytilicola,Neocopepoda,NA,Metazoa,Cyclopoida,Arthropoda,Mytilicola intestinalis,NA,Copepoda,NA,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Podoplea,NA
+315,Numenius  arquata,genus,32638,Aves,NA,Scolopacidae,Numenius,Neognathae,NA,Metazoa,Charadriiformes,Chordata,NA,NA,NA,NA,NA,NA,NA,Craniata,NA,Sarcopterygii,NA,Eukaryota,NA,NA
+316,Numenius  phaeopus,genus,32638,Aves,NA,Scolopacidae,Numenius,Neognathae,NA,Metazoa,Charadriiformes,Chordata,NA,NA,NA,NA,NA,NA,NA,Craniata,NA,Sarcopterygii,NA,Eukaryota,NA,NA
+317,Nyctotherus ,genus,70074,Armophorea,NA,Metopidae,Nyctotherus,NA,NA,NA,Metopida,Ciliophora,NA,NA,NA,NA,NA,NA,NA,Intramacronucleata,NA,NA,NA,Eukaryota,NA,NA
+322,Opalina ,genus,94775,NA,NA,Opalinidae,Opalina,NA,NA,NA,Slopalinida,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+338,Paramonostomum chabaudi,genus,138571,Trematoda,NA,Notocotylidae,Paramonostomum,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Pronocephalata,NA,NA,NA,Pronocephaloidea,Eukaryota,NA,NA
+340,Paraonis sp.,genus,397593,Polychaeta,NA,Paraonidae,Paraonis,NA,NA,Metazoa,Scolecida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+354,Phalacrocorax  melanoleucos,genus,9207,Aves,NA,Phalacrocoracidae,Phalacrocorax,Neognathae,NA,Metazoa,Pelecaniformes,Chordata,NA,NA,NA,NA,NA,NA,NA,Craniata,NA,Sarcopterygii,NA,Eukaryota,NA,NA
+355,Phalacrocorax  varius,genus,9207,Aves,NA,Phalacrocoracidae,Phalacrocorax,Neognathae,NA,Metazoa,Pelecaniformes,Chordata,NA,NA,NA,NA,NA,NA,NA,Craniata,NA,Sarcopterygii,NA,Eukaryota,NA,NA
+356,Philophthalmus sp. ,genus,685953,Trematoda,NA,Philophthalmidae,Philophthalmus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+359,Phoxocephalus regium,genus,2449126,Malacostraca,NA,Phoxocephalidae,Phoxocephalus,NA,NA,Metazoa,Amphipoda,Arthropoda,NA,NA,Eumalacostraca,NA,NA,NA,Gammaridea,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,NA
+367,Podocotyle atomon,species,1231037,Trematoda,NA,Opecoelidae,Podocotyle,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Podocotyle atomon,NA,Digenea,NA,NA,NA,Xiphidiata,NA,NA,NA,Allocreadioidea,Eukaryota,NA,NA
+373,Praunus flexuosus,species,236572,Malacostraca,NA,Mysidae,Praunus,NA,NA,Metazoa,Mysida,Arthropoda,Praunus flexuosus,NA,Eumalacostraca,Mysinae,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,Mysini
+374,Praunus inermis,species,1732120,Malacostraca,NA,Mysidae,Praunus,NA,NA,Metazoa,Mysida,Arthropoda,Praunus inermis,NA,Eumalacostraca,Mysinae,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Peracarida,Mysini
+377,Profilicollis antarcticus,species,1822490,Palaeacanthocephala,NA,Polymorphidae,Profilicollis,NA,NA,Metazoa,Polymorphida,Acanthocephala,Profilicollis antarcticus,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+378,Profilicollis botulus,species,449646,Palaeacanthocephala,NA,Polymorphidae,Profilicollis,NA,NA,Metazoa,Polymorphida,Acanthocephala,Profilicollis botulus,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+379,Profilicollis novaezelandensis,species,2170607,Palaeacanthocephala,NA,Polymorphidae,Profilicollis,NA,NA,Metazoa,Polymorphida,Acanthocephala,Profilicollis novaezelandensis,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+388,Pseudocorynosoma constrictum,species,500319,Palaeacanthocephala,NA,Polymorphidae,Pseudocorynosoma,NA,NA,Metazoa,Polymorphida,Acanthocephala,Pseudocorynosoma constrictum,NA,NA,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+394,Psilochasmus aglyptorchis,genus,99735,Trematoda,NA,Psilostomidae,Psilochasmus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,NA,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+395,Psilochasmus oxyurus,species,99736,Trematoda,NA,Psilostomidae,Psilochasmus,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Psilochasmus oxyurus,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+396,Psilostomum brevicolle,species,1775848,Trematoda,NA,Psilostomidae,Psilostomum,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Psilostomum brevicolle,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+400,Rhabdochona sp.,genus,378081,Chromadorea,NA,Rhabdochonidae,Rhabdochona,NA,Spiruromorpha,Metazoa,Rhabditida,Nematoda,NA,NA,NA,NA,NA,NA,Spirurina,NA,NA,NA,Spiruroidea,Eukaryota,NA,NA
+403,Ribeiroia ondatrae,species,296285,Trematoda,NA,Echinostomatidae,Ribeiroia,NA,NA,Metazoa,Plagiorchiida,Platyhelminthes,Ribeiroia ondatrae,NA,Digenea,NA,NA,NA,Echinostomata,NA,NA,NA,Echinostomatoidea,Eukaryota,NA,NA
+406,Sacculina carcini,species,51650,Hexanauplia,NA,Sacculinidae,Sacculina,Cirripedia,NA,Metazoa,Kentrogonida,Arthropoda,Sacculina carcini,NA,Thecostraca,NA,NA,NA,NA,Crustacea,NA,Multicrustacea,NA,Eukaryota,Rhizocephala,NA
+433,Sphaerodorum sp.,genus,948934,Polychaeta,NA,Sphaerodoridae,Sphaerodorum,Aciculata,NA,Metazoa,Phyllodocida,Annelida,NA,NA,Palpata,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+442,Styela  clava,genus,7724,Ascidiacea,NA,Styelidae,Styela,NA,NA,Metazoa,Stolidobranchia,Chordata,NA,NA,NA,NA,NA,NA,NA,Tunicata,NA,NA,NA,Eukaryota,NA,NA
+452,Tetrastemma melanocephalum,species,307678,Enopla,NA,Tetrastemmatidae,Tetrastemma,NA,NA,Metazoa,Monostilifera,Nemertea,Tetrastemma melanocephalum,NA,Hoplonemertea,NA,NA,NA,Eumonostilifera,NA,NA,NA,NA,Eukaryota,NA,NA
+453,Tharyx killariensis,genus,876024,Polychaeta,NA,Cirratulidae,Tharyx,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+454,Tharyx sp.,genus,876024,Polychaeta,NA,Cirratulidae,Tharyx,NA,NA,Metazoa,Spionida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+457,Travisia sp.,genus,205112,Polychaeta,NA,Opheliidae,Travisia,NA,NA,Metazoa,Scolecida,Annelida,NA,NA,Scolecida,NA,NA,NA,NA,NA,NA,NA,NA,Eukaryota,NA,NA
+460,Tringa  erythropus,genus,161681,Aves,NA,Scolopacidae,Tringa,Neognathae,NA,Metazoa,Charadriiformes,Chordata,NA,NA,NA,NA,NA,NA,NA,Craniata,NA,Sarcopterygii,NA,Eukaryota,NA,NA
+463,Tropisternus ,genus,538626,Insecta,Holometabola,Hydrophilidae,Tropisternus,Neoptera,Staphyliniformia,Metazoa,Coleoptera,Arthropoda,NA,NA,Pterygota,Hydrophilinae,NA,NA,Polyphaga,Hexapoda,NA,NA,Hydrophiloidea,Eukaryota,NA,NA
