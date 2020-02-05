@@ -1,0 +1,678 @@
+---
+title: "Genus level analyses"
+author: "Dan Benesh"
+date: "8/14/2019"
+output: html_document
+---
+
+# Background
+
+I'm interested in how life cycle complexity is related to host specificity. [Elsewhere](../species_level_analyses/sp_level_analysis_host_range_freq.html), I have shown that worms with long life cycles have been recorded from more hosts. But could this be driven by cryptic species? Often, parasite species recorded from a wide range of hosts turn out to be a complex of more specialized cryptic species. Since cryptic genera are less likely than cryptic species, one way to address this issue is to re-run the analysis at the level of genera.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+To that end, I re-calculated study effort by querying genus names, instead of species names, see [here](get_study_effort_genus.Rmd). I also re-queried the NHM host-parasite database for genus names instead of species names, see [here](get_HP_records_genus.Rmd). 
+
+```{r importdata}
+lcdb <- read.csv(file = "../../data/CLC_database_updated_names.csv", header = TRUE)
+nhm <- read.csv(file = "../../data/NHM_db_hosts_genus.csv", header = TRUE)
+host_cor <- read.csv(file = "../../data/host_names_corrected_valid_genus.csv", header = TRUE)
+study_eff <- read.csv(file = "../../data/study_effort_genus.csv", header = TRUE)
+```
+```{r}
+tip_names <- read.csv(file = "../../data/data_tree_tips_table.csv")
+lcdb <- left_join(lcdb, tip_names) # for matching the taxonomy
+lcdb <- mutate(lcdb, parasite_genus = substr(tree_tips, start = 1, stop = regexpr("_", tree_tips)-1))
+```
+
+```{r}
+# remove vague host records starting with parentheses or brackets
+nhm <- filter(nhm, !grepl(pattern = "^\\(", Host))%>% 
+  filter(!grepl(pattern = "^\\[", Host))%>%
+  select(Parasite.species = Parasite, Host.species = Host)
+lcdb <- filter(lcdb, !grepl(pattern = "^\\(", Host.species))%>% 
+  filter(!grepl(pattern = "^\\[", Host.species))
+
+# remove subgenera from host names
+nhm <- mutate(nhm, Host.species = gsub(pattern = "\\(.*\\) ", replacement = "", Host.species))
+lcdb <- mutate(lcdb, Host.species = gsub(pattern = "\\(.*\\) ", replacement = "", Host.species))
+```
+```{r}
+# manually correct some host records; things not found by GNR in first go
+nhm$Host.species[which(nhm$Host.species == "Acitits macularia")] <- "Actitis macularius"
+nhm$Host.species[which(nhm$Host.species == "Atelexia albiventris")] <- "Atelerix albiventris"
+nhm$Host.species[which(nhm$Host.species == "Centophilus sp.")] <- "Ceuthophilus sp."
+nhm$Host.species[which(nhm$Host.species == "Candonia ")] <- "Candona sp."
+nhm$Host.species[which(nhm$Host.species == "Cincindella erudata")] <- "Cicindela erudata"
+nhm$Host.species[which(nhm$Host.species == "Cincindella sexpunctata")] <- "Cicindela sexpunctata"
+nhm$Host.species[which(nhm$Host.species == "Cincindella vigintigutta")] <- "Cicindela vigintigutta"
+nhm$Host.species[which(nhm$Host.species == "Chelodina Iongicollis")] <- "Chelodina longicollis"
+nhm$Host.species[which(nhm$Host.species == "Cionella Iubrica")] <- "Cionella lubrica"
+nhm$Host.species[which(nhm$Host.species == "Coryphilla sp.")] <- "Coryphella sp."
+nhm$Host.species[which(nhm$Host.species == "Cylindrojulus sp.")] <- "Cylindroiulus sp."
+nhm$Host.species[which(nhm$Host.species == "Dusycion culpaeus")] <- "Lycalopex culpaeus"
+nhm$Host.species[which(nhm$Host.species == "Dusycion griseus")] <- "Lycalopex griseus"
+nhm$Host.species[which(nhm$Host.species == "Helodrillus ")] <- "Helodrilus"
+nhm$Host.species[which(nhm$Host.species == "Lepidocirtus sp.")] <- "Lepidocyrtus sp."
+nhm$Host.species[which(nhm$Host.species == "M?n???lephorus rubroniveus")] <- "Monopylephorus rubroniveus"
+nhm$Host.species[which(nhm$Host.species == "Meleagridis gallopavo silvestris")] <- "Meleagris gallopavo"
+nhm$Host.species[which(nhm$Host.species == "Ototylomysphyllotis phyllotis")] <- "Ototylomys phyllotis"
+nhm$Host.species[which(nhm$Host.species == "Paracylopina sp.")] <- "Paracyclopina sp."
+nhm$Host.species[which(nhm$Host.species == "Pleurdonte sagemon")] <- "Pleurodonte sagemon"
+nhm$Host.species[which(nhm$Host.species == "Procyonis lotor")] <- "Procyon lotor"
+nhm$Host.species[which(nhm$Host.species == "Tenebriodes nana")] <- "Tenebroides nana"
+nhm$Host.species[which(nhm$Host.species == "Thryrissa hamiltoni")] <- "Thryssa hamiltonii"
+nhm$Host.species[which(nhm$Host.species == "Thylacine cynocephalus")] <- "Thylacinus cynocephalus"
+nhm$Host.species[which(nhm$Host.species == "Trichorythodes")] <- "Tricorythodes"
+nhm$Host.species[which(nhm$Host.species == "Utorides striatus")] <- "Butorides striata"
+nhm$Host.species[which(nhm$Host.species == "Exorbatula sp. cf. biundatus")] <- "Exoribatula sp."
+
+lcdb$Host.species[which(lcdb$Host.species == "Acitits macularia")] <- "Actitis macularius"
+lcdb$Host.species[which(lcdb$Host.species == "Atelexia albiventris")] <- "Atelerix albiventris"
+lcdb$Host.species[which(lcdb$Host.species == "Centophilus sp.")] <- "Ceuthophilus sp."
+lcdb$Host.species[which(lcdb$Host.species == "Candonia ")] <- "Candona sp."
+lcdb$Host.species[which(lcdb$Host.species == "Cincindella erudata")] <- "Cicindela erudata"
+lcdb$Host.species[which(lcdb$Host.species == "Cincindella sexpunctata")] <- "Cicindela sexpunctata"
+lcdb$Host.species[which(lcdb$Host.species == "Cincindella vigintigutta")] <- "Cicindela vigintigutta"
+lcdb$Host.species[which(lcdb$Host.species == "Chelodina Iongicollis")] <- "Chelodina longicollis"
+lcdb$Host.species[which(lcdb$Host.species == "Cionella Iubrica")] <- "Cionella lubrica"
+lcdb$Host.species[which(lcdb$Host.species == "Coryphilla sp.")] <- "Coryphella sp."
+lcdb$Host.species[which(lcdb$Host.species == "Cylindrojulus sp.")] <- "Cylindroiulus sp."
+lcdb$Host.species[which(lcdb$Host.species == "Dusycion culpaeus")] <- "Lycalopex culpaeus"
+lcdb$Host.species[which(lcdb$Host.species == "Dusycion griseus")] <- "Lycalopex griseus"
+lcdb$Host.species[which(lcdb$Host.species == "Helodrillus ")] <- "Helodrilus"
+lcdb$Host.species[which(lcdb$Host.species == "Lepidocirtus sp.")] <- "Lepidocyrtus sp."
+lcdb$Host.species[which(lcdb$Host.species == "M?n???lephorus rubroniveus")] <- "Monopylephorus rubroniveus"
+lcdb$Host.species[which(lcdb$Host.species == "Meleagridis gallopavo silvestris")] <- "Meleagris gallopavo"
+lcdb$Host.species[which(lcdb$Host.species == "Ototylomysphyllotis phyllotis")] <- "Ototylomys phyllotis"
+lcdb$Host.species[which(lcdb$Host.species == "Paracylopina sp.")] <- "Paracyclopina sp."
+lcdb$Host.species[which(lcdb$Host.species == "Pleurdonte sagemon")] <- "Pleurodonte sagemon"
+lcdb$Host.species[which(lcdb$Host.species == "Procyonis lotor")] <- "Procyon lotor"
+lcdb$Host.species[which(lcdb$Host.species == "Tenebriodes nana")] <- "Tenebroides nana"
+lcdb$Host.species[which(lcdb$Host.species == "Thryrissa hamiltoni")] <- "Thryssa hamiltonii"
+lcdb$Host.species[which(lcdb$Host.species == "Thylacine cynocephalus")] <- "Thylacinus cynocephalus"
+lcdb$Host.species[which(lcdb$Host.species == "Trichorythodes")] <- "Tricorythodes"
+lcdb$Host.species[which(lcdb$Host.species == "Utorides striatus")] <- "Butorides striata"
+lcdb$Host.species[which(lcdb$Host.species == "Exorbatula sp. cf. biundatus")] <- "Exoribatula sp."
+```
+```{r}
+# replace all instances of spp. with sp.
+nhm <- mutate(nhm, Host.species = gsub("spp\\.", "sp\\.", Host.species))
+lcdb <- mutate(lcdb, Host.species = gsub("spp\\.", "sp\\.", Host.species))
+
+# remove trailing white space in host names
+nhm <- mutate(nhm, Host.species = gsub("\\s+$", "", Host.species)) 
+lcdb <- mutate(lcdb, Host.species = gsub("\\s+$", "", Host.species)) 
+
+# add 'sp.' to all instances of just genera given, e.g. 'Gammarus' is changed to 'Gammarus sp.'
+nhm <- mutate(nhm, Host.species = if_else( !grepl(" ", Host.species), # if 1 word host name, add sp.
+                                                             paste(Host.species, "sp."),
+                                                             Host.species))
+lcdb <- mutate(lcdb, Host.species = if_else( !grepl(" ", Host.species), # if 1 word host name, add sp.
+                                                             paste(Host.species, "sp."),
+                                                             Host.species))
+
+# remove records that are hybrids
+nhm <- filter(nhm, !grepl("hybrid$", Host.species))
+lcdb <- filter(lcdb, !grepl("hybrid$", Host.species))
+```
+```{r}
+# first run this for the lcdb dataset
+lcdb <- mutate(lcdb, best_genus = substr(best_host_name, 1, regexpr(" ", best_host_name)-1)) # make genus var
+
+rows_w_genussp <- which( grepl("sp\\.", lcdb$best_host_name)) # id rows to check
+
+
+# loop through rows to check, find cases where there are congenerics with the Genus sp. row
+rows_to_remove <- numeric()
+for(i in rows_w_genussp){
+  g_check <- lcdb[i, "best_genus"]
+  mv <- lcdb[i,]
+  ds <- filter(lcdb, Parasite.species == mv$Parasite.species)
+  occ_of_genus <- sum(ds$best_genus == g_check, na.rm=T)
+  
+  if(occ_of_genus > 1) {
+    # if more than one occurrence of genus, mark row for removal
+    rows_to_remove <- c(rows_to_remove, i)
+  }
+}
+
+
+lcdb <- lcdb[-rows_to_remove,] # remove them
+```
+```{r}
+nhm <- left_join(nhm, 
+                 select(host_cor, host_record_lcdb_nhm, best_host_name), by = c("Host.species" = "host_record_lcdb_nhm"))
+```
+```{r}
+# then for the nhm data
+nhm <- mutate(nhm, best_genus = substr(best_host_name, 1, regexpr(" ", best_host_name)-1)) # make genus var
+
+rows_w_genussp <- which( grepl("sp\\.", nhm$best_host_name)) # id rows to check
+
+
+# loop through rows to check, find cases where there are congenerics with the Genus sp. row
+rows_to_remove <- numeric()
+for(i in rows_w_genussp){
+  g_check <- nhm[i, "best_genus"]
+  mv <- nhm[i,]
+  ds <- filter(nhm, Parasite.species == mv$Parasite.species)
+  occ_of_genus <- sum(ds$best_genus == g_check, na.rm=T)
+  
+  if(occ_of_genus > 1) {
+    # if more than one occurrence of genus, mark row for removal
+    rows_to_remove <- c(rows_to_remove, i)
+  }
+}
+
+
+nhm <- nhm[-rows_to_remove,] # remove them
+```
+
+Another complication with using genus names instead of species names is that species within a genus can have different life cycle lengths. For example, one species may use a paratenic host, while a congeneric may not. Thus, I averaged life cycle length (max) across species in a genus.
+
+```{r}
+lcl <- group_by(lcdb, Parasite.species)%>%
+  summarize(lcl_max = max(Host.no, na.rm = T))
+lcdb <- left_join(lcdb, lcl)
+```
+
+Because more diverse genera are likely to be recorded from more hosts, I also recorded the number of species in each genus when averaging across genera. I took these averages using just records from the life cycle database, as well as the combined records from life cycle and nhm databases.
+
+```{r}
+genus_lev <- lcdb%>%
+  group_by(Parasite.genus, parasite_genus)%>%
+  filter(Missing.info != 1)%>%
+  select(Parasite.genus, parasite_genus, Host.species)%>%distinct()%>%
+  summarize(num_hosts_lcdb = n()) # calculate number of hosts recorded for a genus in lcdb
+```
+
+```{r}
+genus_lev2 <- lcdb%>%group_by(Parasite.species, parasite_genus)%>%
+  select(Parasite.species, lcl_max)%>%distinct()%>%
+  ungroup()%>%group_by(parasite_genus)%>%
+  summarize(num_sp_lcdb = n(), avg_lcl_max = mean(lcl_max, na.rm = T)) # calculate avg lcl for a genus in lcdb
+```
+
+```{r}
+genus_lev <- left_join(genus_lev, genus_lev2)
+rm(genus_lev2)
+```
+
+```{r}
+# reduce lcdb for combining
+lcdb_red <- filter(lcdb, !is.na(Host.species), !is.na(Host.common.name))%>%
+  select(Parasite.species, parasite_genus, best_host_name)
+
+# reduce nhm for combining
+nhm <- mutate(nhm, parasite_genus = substr(Parasite.species, 1, regexpr(" ", Parasite.species)-1))
+nhm_red <- select(nhm, Parasite.species, parasite_genus, best_host_name)
+```
+
+```{r}
+# combine them
+dat_lcdb_nhm <- bind_rows(lcdb_red, nhm_red)%>%distinct()
+```
+```{r}
+# remove GENUS SP. cases in combined data
+dat_lcdb_nhm <- mutate(dat_lcdb_nhm, best_genus = substr(best_host_name, 1, regexpr(" ", best_host_name)-1)) # make genus var
+
+rows_w_genussp <- which( grepl("sp\\.", dat_lcdb_nhm$best_host_name)) # id rows to check
+
+
+# loop through rows to check, find cases where there are congenerics with the Genus sp. row
+rows_to_remove <- numeric()
+for(i in rows_w_genussp){
+  g_check <- dat_lcdb_nhm[i, "best_genus"]
+  mv <- dat_lcdb_nhm[i,]
+  ds <- filter(dat_lcdb_nhm, Parasite.species == mv$Parasite.species)
+  occ_of_genus <- sum(ds$best_genus == g_check, na.rm=T)
+  
+  if(occ_of_genus > 1) {
+    # if more than one occurrence of genus, mark row for removal
+    rows_to_remove <- c(rows_to_remove, i)
+  }
+}
+
+
+dat_lcdb_nhm <- dat_lcdb_nhm[-rows_to_remove,] # remove them
+```
+
+
+
+```{r}
+num_hosts2 <- filter(dat_lcdb_nhm, parasite_genus %in% lcdb_red$parasite_genus)%>%
+  group_by(parasite_genus)%>%
+  summarize(num_hosts_lcdb_nhm = n()) # calculate number of hosts for each genus in lcdb and nhm combined
+```
+```{r}
+genus_lev3 <- dat_lcdb_nhm%>%group_by(Parasite.species, parasite_genus)%>%
+  select(Parasite.species)%>%distinct()%>%
+  ungroup()%>%group_by(parasite_genus)%>%
+  summarize(num_sp_lcdb_nhm = n()) # calculate number of species in genus when combining databases
+```
+
+```{r}
+genus_lev <- left_join(genus_lev, num_hosts2)
+genus_lev <- left_join(genus_lev, genus_lev3)
+rm(num_hosts2)
+```
+
+```{r}
+# Add study effort
+genus_lev <- left_join(genus_lev, select(study_eff, Parasite.genus, pubs_lcdb = n_lcdb, pubs_pubmed = n_pubmed_gen_group), by = "Parasite.genus")
+```
+
+```{r}
+# add worm taxonomy to df
+acanth_tax <- read.csv("../parasite_phylogeny/acanth_taxonomy.csv")
+acanth_tax <- select(acanth_tax, species, genus, family, order, class, phylum)
+
+cest_tax <- read.csv("../parasite_phylogeny/cest_taxonomy.csv")
+cest_tax <- select(cest_tax, species, genus, family, order, class, phylum)
+
+nem_tax <- read.csv("../parasite_phylogeny/nem_taxonomy_rotl.csv")
+nem_tax <- select(nem_tax, species, genus, family, order, class, phylum)
+
+worm_tax <- rbind(acanth_tax, cest_tax, nem_tax)
+worm_tax <- select(worm_tax, -species)%>%distinct()
+```
+```{r}
+genus_lev <- left_join(genus_lev, 
+                       select(worm_tax, parasite_genus = genus, parasite_family = family, parasite_order = order, parasite_class = class, parasite_phylum = phylum)%>%distinct(), 
+                       by = "parasite_genus") # for matching the taxonomy
+```
+```{r}
+genus_lev <- genus_lev%>%
+  ungroup()%>%
+  mutate(obs = 1:length(Parasite.genus), # obs-level variable
+         zstudy_effort = log10(pubs_pubmed+1) - mean(log10(pubs_pubmed+1), na.rm=T) )
+```
+
+After creating a genus level dataset, we can look at whether some of the patterns observed previously are also recapitulated in a genus-level analysis.
+
+Are the number of host records correlated in the two databases? Yes, though since they are combined, lcdb set a lower limit on the combined number of records.
+
+```{r}
+ggplot(genus_lev, aes(x = num_hosts_lcdb, y = num_hosts_lcdb_nhm)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth() +
+  scale_x_log10() + scale_y_log10()
+```
+
+Also, the species sampling is kinda representative in the database. When there are more species in a genus in the life cycle database, there were also more species in that genus in the NHM database. I'm a little surprised the relationsip is so clear, because diverse genera are not necessirly those with known life cycles.
+
+```{r}
+ggplot(genus_lev, aes(x = num_sp_lcdb, y = num_sp_lcdb_nhm)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth() +
+  scale_x_log10() + scale_y_log10()
+```
+
+
+# Host range
+
+At the level of genera, host range, the number of host species recorded, is correlated with life cycle length. This is the case if we use just the life cycle database records or the combination of life cycle and NHM datasets.
+
+```{r}
+ggplot(genus_lev, aes(x = avg_lcl_max, y = num_hosts_lcdb)) +
+  geom_point(aes(size = num_sp_lcdb), alpha = 0.3, position = position_jitter(width = 0.1, height = 0)) +
+  geom_smooth(method = 'lm', se = F) +
+  scale_y_log10() +
+  labs(x = "Average life cycle length (max)", y = "Genus host range (LCDB)", title = "Just LCDB records", size = "Species in genus in LCDB")
+```
+
+```{r}
+ggplot(genus_lev, aes(x = avg_lcl_max, y = num_hosts_lcdb_nhm)) +
+  geom_point(aes(size = num_sp_lcdb_nhm), alpha = 0.3, position = position_jitter(width = 0.1, height = 0)) +
+  geom_smooth(method = 'lm', se = F) +
+  scale_y_log10() +
+  labs(x = "Average life cycle length (max)", y = "Genus host range (LCDB + NHM)", title = "LCDB + NHM records", size = "Species in genus\nin LCDB + NHM")
+```
+
+However, we can also see that the host range increases with the number of species in the genus in the life cycle database. If there are more parasite species in a genus, then it makes sense that the host range for the genus overall is larger. 
+
+```{r}
+ggplot(genus_lev, aes(x = num_sp_lcdb_nhm, y = num_hosts_lcdb_nhm)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = 'lm', se = F) +
+  scale_y_log10() + scale_x_log10() +
+  labs(y = "Genus host range (LCDB + NHM)", title = "LCDB + NHM records", x = "Species in genus in LCDB + NHM")
+```
+
+If we average out this effect and plot the average host species per parasite species in a genus, we still see the positive relationship, though it is weaker.
+
+```{r}
+ggplot(genus_lev, aes(x = avg_lcl_max, y = num_hosts_lcdb_nhm/num_sp_lcdb)) +
+  geom_point(alpha = 0.3, position = position_jitter(width = 0.1, height = 0)) +
+  geom_smooth(method = 'lm', se = F) +
+  scale_y_log10() +
+  labs(x = "Average life cycle length (max)", y = "Hosts per species in genus (LCDB + NHM)", title = "LCDB + NHM records", size = "Species in LCDB in genus")
+```
+
+Also, we still have to consider study effort: the number of host records increases with study effort (i.e. pubmed hits for a genus name).
+
+```{r}
+ggplot(genus_lev, aes(x = pubs_pubmed+1, y = num_hosts_lcdb_nhm)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = 'lm', se = F) +
+  scale_x_log10() + scale_y_log10() +
+  labs(x = "PubMed hits", y = "Genus host range (LCDB + NHM)", title = "LCDB + NHM records", size = "Average life cycle length (max)")
+```
+
+I fitted taxonomic mixed models. The models returned similar results to those seen at the species level. Namely, after correcting for study effort and the parasite diversity in each genus, there is still a positive relationship between generalism and life cycle length.
+
+```{r}
+library(lme4)
+```
+
+```{r}
+reg0 <- glmer(num_hosts_lcdb_nhm ~ 1 + (1|obs) + # observation-level RE accounts for overdispersion and is signif
+                (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+            data = filter(genus_lev, !is.na(pubs_pubmed), !is.na(avg_lcl_max), !is.na(num_sp_lcdb_nhm)),
+            family = 'poisson'
+            )
+reg1 <- update(reg0, . ~ . + zstudy_effort)
+reg2 <- update(reg1, . ~ . + avg_lcl_max)
+reg2.1 <- update(reg1, . ~ . + log10(num_sp_lcdb_nhm))
+reg3 <- update(reg2.1, . ~ . + avg_lcl_max)
+reg4 <- update(reg3, . ~ . + I(avg_lcl_max^2))
+```
+
+Effect of life cycle length without considering species diversity.
+
+```{r}
+anova(reg0, reg1, reg2)
+```
+
+Effect of life cycle length after accounting for species diversity.
+```{r}
+anova(reg0, reg1, reg2.1, reg3, reg4)
+```
+
+```{r}
+## function to calculate r2 for GLMER models
+b0 <- fixef(reg0)
+varD <- log(1 + 1/exp(b0)) # distribution specific variance
+rm(b0)
+
+r2_glmm_tax <- function(model) {
+  # take in compound poisson mixed model, return marginal and conditional R2, ala Nakagawa et al. 2017
+  # marginal r2 is just fixed effects
+  # condition r2 is fixed and rand effects combined
+  
+  # model call
+  call <- as.character(model@call)[2]
+
+  # parameter estimates and df
+  fixed_param <- fixef(model)
+  df <- length(fixed_param) - 1
+
+  # variance due to fixed effects
+  pred <- as.vector(model.matrix(model) %*% fixed_param) # predicteds on basis of just fixed effects
+  varF <- var(pred)
+
+
+  # variance due to rand effects
+  vc <- as.data.frame(VarCorr(model))
+  varE <- filter(vc, grp == "obs")$vcov # residual var
+  vc <- filter(vc, grp != "obs")
+  varR <- sum(vc$vcov) # random effect var
+
+  # marginal r2
+  mr2 <- varF/(varF + varR + varE + varD)
+
+  # conditional r2
+  cr2 <- (varF + varR)/(varF + varR + varE + varD)
+
+  # output
+  out_frame <- data_frame(call = call, df = df, marg_r2 = round(mr2, 3), cond_r2 = round(cr2,3))
+  return(out_frame)
+}
+```
+```{r}
+mod_list <- list(reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_glmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_glmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("taxonomy", "study effort", "life cycle length")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_table
+```
+
+
+```{r}
+mod_list <- list(reg0, reg1, reg2.1, reg3, reg4)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_glmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_glmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("taxonomy", "study effort", "species diversity", "life cycle length", "life cycle length, quadratic")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_table
+```
+
+Here are some descriptives. Number of genera:
+
+```{r}
+ng <- filter(genus_lev, !is.na(pubs_pubmed), !is.na(avg_lcl_max), !is.na(num_sp_lcdb_nhm))
+length(ng$Parasite.genus)
+```
+
+Number of host records
+
+```{r}
+sum(ng$num_hosts_lcdb_nhm)
+```
+
+
+# Taxonomic dissimilarity
+
+Let's also conduct a genus level analysis of host taxonomic dissimilarity, our second measure of generalism. The taxonomy of the expanded host set was downloaded, and taxonomic dissimilarity was calculated for each parasite genus.
+
+```{r}
+host.tax <- read.csv(file="../../data/ncbi_host_taxonomy2.csv", header = TRUE, sep=",") # taxonomy from NCBI
+```
+```{r}
+dat_lcdb_nhm <- left_join(dat_lcdb_nhm, 
+                          select(host.tax, sp.query, genus, family, order, class, phylum)%>%distinct(),
+                          by = c("best_host_name" = "sp.query"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+# remove hosts missing taxonomic info
+phy.hs <- select(dat_lcdb_nhm, parasite_genus, best_host_name,
+                 genus, family, order, class, phylum)%>%
+  filter(!is.na(genus), !is.na(family), !is.na(order), !is.na(class), !is.na(phylum))%>%
+  distinct()
+```
+
+```{r, message=FALSE, warning=FALSE}
+source("../calculate_specificity_index/host_specificity_index_calculation_functions.R")
+```
+
+```{r, message=FALSE, warning=FALSE}
+spst <- select(phy.hs, parasite_genus)%>%distinct()%>%na.omit() # unique parasite spp after removing hosts with missing tax data
+spst$hsi_comb <- NA # numeric to collect calculated host specificity index
+spst$var.hsi_comb <- NA # numeric to collect calculated variation in host specificity index
+
+for(i in seq_along(spst$parasite_genus)){
+  mv <- spst[i,]
+  ds <- filter(phy.hs, parasite_genus == mv$parasite_genus)
+  hsi_comb.out <- with(ds, hs.index(best_host_name, genus, family, order, class, phylum)) # calc host spec index
+  spst$hsi_comb[i] <- hsi_comb.out[1]
+  spst$var.hsi_comb[i] <- hsi_comb.out[2]
+  rm(mv, ds, hsi_comb.out, i)
+}
+# two notes: host spec values include atypical species and they were calculated omitting hosts without full tax info
+```
+
+```{r}
+genus_lev <- left_join(genus_lev, spst)
+```
+
+The pattern of taxonomic dissimilarity at the genus level mirrors that at the species level. More species in a genus seems to be associated with more host taxonomic diversity.
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+
+ggplot(genus_lev, aes(x = avg_lcl_max, y = hsi_comb)) +
+  geom_point(aes(size = num_sp_lcdb_nhm), alpha = 0.3, position = position_jitter(width = 0.1, height = 0)) +
+  geom_smooth(se = F) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Average life cycle length (max)", y = "Taxonomic dissimilarity (LCDB+NHM)", title = "LCDB+NHM records", size = "Species in DB in genus")
+```
+
+Taxonomic dissimilarity is not clearly related to study effort. But diversity and study effort appear related: genera with more species fall on the right hand side of the plot (more Pubmed hits).
+
+```{r}
+ggplot(genus_lev, aes(x = pubs_pubmed+1, y = hsi_comb)) +
+  geom_point(aes(size = num_sp_lcdb_nhm), alpha = 0.3) +
+  geom_smooth(se = F) +
+  scale_x_log10() +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Pubmed hits", y = "Taxonomic dissimilarity (LCDB+NHM)", title = "LCDB+NHM records", size = "Species in DB in genus")
+```
+
+Species diversity, though, does not seem to impact a parasite's overall taxonomic diversity.
+
+```{r}
+ggplot(genus_lev, aes(x = num_sp_lcdb_nhm, y = hsi_comb)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(se = F) +
+  scale_x_log10() +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Species in genus in LCDB + NHM", y = "Taxonomic dissimilarity (LCDB+NHM)")
+
+```
+
+
+The pattern is the same as observed at the species level: adding study effort had no effect, but adding a non-linear life cycle term did have an effect.
+
+```{r}
+reg0 <- lmer(hsi_comb ~ 1 + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum), 
+             data = filter(genus_lev, !is.na(pubs_pubmed), !is.na(avg_lcl_max), !is.na(num_sp_lcdb_nhm)) )
+reg1 <- update(reg0, . ~ . + zstudy_effort)
+reg2 <- update(reg1, . ~ . + avg_lcl_max)
+reg2.1 <- update(reg1, . ~ . + log10(num_sp_lcdb_nhm))
+reg3 <- update(reg2.1, . ~ . + avg_lcl_max)
+reg4 <- update(reg3, . ~ . + I(avg_lcl_max^2))
+```
+
+Effect of life cycle length without considering species diversity.
+
+```{r}
+anova(reg0, reg1, reg2)
+```
+
+Effect of life cycle length after accounting for species diversity.
+```{r}
+anova(reg0, reg1, reg2.1, reg3, reg4)
+```
+
+
+```{r}
+r2_lmm_tax <- function(model) {
+  # take in compound poisson mixed model, return marginal and conditional R2, ala Nakagawa et al. 2017
+  # marginal r2 is just fixed effects
+  # condition r2 is fixed and rand effects combined
+
+  # model call
+  call <- as.character(model@call)[2]
+
+  # parameter estimates and df
+  fixed_param <- fixef(model)
+  df <- length(fixed_param) - 1
+
+  # variance due to fixed effects
+  pred <- as.vector(model.matrix(model) %*% fixed_param) # predicteds on basis of just fixed effects
+  varF <- var(pred)
+
+
+  # variance due to rand effects
+  vc <- VarCorr(reg1)
+  varR <- vc$parasite_family[1] + vc$parasite_order[1] + vc$parasite_class[1] + vc$parasite_phylum[1]
+
+  # residual var
+  varE <- attr(vc, 'sc')^2
+
+
+
+  # marginal r2
+  mr2 <- varF/(varF + varR + varE)
+
+  # conditional r2
+  cr2 <- (varF + varR)/(varF + varR + varE)
+
+  # output
+  out_frame <- data_frame(call = call, df = df, marg_r2 = round(mr2, 3), cond_r2 = round(cr2,3))
+  return(out_frame)
+}
+```
+```{r}
+mod_list <- list(reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("taxonomy", "study effort", "life cycle length")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_table
+```
+
+```{r}
+mod_list <- list(reg0, reg1, reg2.1, reg3, reg4)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("taxonomy", "study effort", "species diversity", "life cycle length", "life cycle length, quadratic")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
+r2_table
+```
+

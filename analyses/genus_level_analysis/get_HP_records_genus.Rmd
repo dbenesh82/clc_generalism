@@ -1,0 +1,83 @@
+---
+title: "get H-P records"
+author: "Dan Benesh"
+date: "7/2/2019"
+output: html_document
+---
+
+This script collects the host lists for parasite species in the life cycle database.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(helminthR)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r importdata}
+dat_host <- read.csv(file = "../../data/CLC_database_hosts.csv", header = TRUE)
+```
+
+```{r}
+# problematic parasite names
+dat_host$Parasite.species_updated <- dat_host$Parasite.species
+
+
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Dioctophyma renale")] <- "Dioctophyme renale" # misspelled name in data
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Acanthogyrus (Acanthosentis) lizae")] <- "Acanthogyrus adriaticus" # synonym
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Callotetrarhynchus nipponica")] <- "Callitetrarhynchus gracilis" # synonym
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Pediobothrium sp.")] <- "Pedibothrium sp." # misspelled name in data
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Amplicaecum robertsi")] <- "Ophidascaris robertsi" # synonym
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Metaleptus rabuka")] <- "Mooleptus rabuka" # synonym
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Taenia taeniaeformis")] <- "Hydatigera taeniaeformis" # synonym
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Taenia krepkogorski")] <- "Hydatigera krepkogorski" # synonym
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Taenia mustelae")] <- "Versteria mustelae" # synonym
+dat_host$Parasite.species_updated[which(dat_host$Parasite.species == "Taenia ovis/krabbei")] <- "Taenia ovis" # this dat_host has sequences avail and is in 'mega tree'
+
+dat_host <- mutate(dat_host, Parasite.genus_updated = substr(Parasite.species_updated, 1, stop = regexpr(" ", Parasite.species_updated)-1))
+# select(dat_host, Parasite.species, Parasite.species_updated, Parasite.genus, Parasite.genus_updated)%>%distinct()%>%
+#   filter(Parasite.species != Parasite.species_updated)
+# select(dat_host, Parasite.species, Parasite.species_updated, Parasite.genus, Parasite.genus_updated)%>%distinct()%>%
+#   filter(Parasite.genus != Parasite.genus_updated)
+
+```
+
+First create variables to query the NHM database.
+
+```{r}
+genus <- unique(dat_host$Parasite.genus_updated) # parasite genus
+
+group <- select(dat_host, Parasite.genus_updated, Parasite.group)%>%
+  mutate(group2 = if_else(Parasite.group == 'nematode', "Nematodes",
+                          if_else(Parasite.group == 'cestode', 'Cestodes', 'Acanthocephalans')))%>%
+  distinct()
+group <- group$group2 # group vector
+```
+
+Loop over species in the database, compile host list dataframe.
+
+```{r}
+for(i in seq_along(genus)){
+  
+  # get hosts from NHM H-P database
+  host_output <- findParasite(genus = genus[i], group = group[i])
+  cat(length(host_output$Host), "host records for", genus[i], '\n', sep = " ")
+  
+  if(i == 1){
+    host_output_combined <- host_output
+  } else {
+    host_output_combined <- bind_rows(host_output_combined, host_output)
+  }
+  
+}
+```
+
+```{r}
+write.csv(host_output_combined, file = "../../data/NHM_db_hosts_genus.csv", row.names = F)
+```
+
+
+
