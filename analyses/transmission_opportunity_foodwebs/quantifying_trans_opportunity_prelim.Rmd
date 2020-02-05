@@ -1,0 +1,1530 @@
+---
+title: "Food-web-determined transmission opportunity"
+author: "Dan Benesh"
+date: "11/7/2019"
+output: html_document
+---
+
+I used a compilation of food webs (data from this [paper](https://www.nature.com/articles/s41559-019-0899-x)) to examine how species diversity and diet breadth vary with trophic level. This is relevant for the transmission of trophically-transmitted parasites. On the one hand, transmission 'opportunity' decreases as worms move up the food web, because there are fewer secondary consumers than primary consumers, fewer tertiary consumers than secondary consumers, and so on (i.e. trophic pyramid). On the other hand, transmission opportunity increases with trophic level because higher level predators tend to have more varied diets, increasing the number of transmission pathways to a top predator.
+
+My goal is to quantify these trends in empirical food webs, so as to better understand patterns of host generalism in trophically-transmitted parasites.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r}
+brose19 <- read.csv(file = "../../../Mapping_LCL/host_similarity_clustering/data/host_mass/283_2_FoodWebDataBase_2018_12_10.csv")
+```
+```{r}
+# sort(unique( paste(brose19$link.citation, ":" , brose19$foodweb.name)))
+```
+
+I exclude parasitic links from this data compilation, leaving mainly herbivory and predation links.
+
+```{r}
+brose19 <- filter(brose19, interaction.type != 'parasitic', interaction.type != 'parasitoid')%>%
+  select(autoID, con.taxonomy, con.taxonomy.level, con.lifestage, con.mass.mean.g.,
+         res.taxonomy, res.taxonomy.level, res.lifestage, res.mass.mean.g., 
+         foodweb.name, web_study = link.citation)
+```
+```{r}
+# head(brose19)
+```
+
+I also include some additional food webs with parasites.
+
+```{r}
+# Otago
+otago_links <- read.csv("../../data/webs/Otago_Data_Links.csv")
+otago_nodes <- read.csv("../../data/webs/Otago_Data_Nodes.csv")
+
+otago_links <- filter(otago_links, LinkType == "Predation")
+otago_links <- left_join(otago_links, select(otago_nodes, NodeID, con.taxonomy = WorkingName, con.taxonomy.level = Resolution, con.lifestage = Stage),
+                         by = c("ConsumerNodeID" = "NodeID"))
+otago_links <- left_join(otago_links, select(otago_nodes, NodeID, res.taxonomy = WorkingName, res.taxonomy.level = Resolution, res.lifestage = Stage),
+                         by = c("ResourceNodeID" = "NodeID"))
+otago_links <- select(otago_links, con.taxonomy, con.taxonomy.level, con.lifestage, res.taxonomy, res.taxonomy.level, res.lifestage)
+otago_links$foodweb.name <- "Otago"
+otago_links$web_study <- "Mouritsen et al. (2011)"
+```
+```{r}
+# Sylt
+sylt_links <- read.csv("../../data/webs/ECOL_92_172/Sylt_Data_Links.csv")
+sylt_nodes <- read.csv("../../data/webs/ECOL_92_172/Sylt_Data_Nodes.csv")
+
+sylt_links <- filter(sylt_links, LinkType == "Predation")
+sylt_links <- left_join(sylt_links, select(sylt_nodes, NodeID, con.taxonomy = WorkingName, con.taxonomy.level = Resolution, con.lifestage = Stage),
+                         by = c("ConsumerNodeID" = "NodeID"))
+sylt_links <- left_join(sylt_links, select(sylt_nodes, NodeID, res.taxonomy = WorkingName, res.taxonomy.level = Resolution, res.lifestage = Stage),
+                         by = c("ResourceNodeID" = "NodeID"))
+sylt_links <- select(sylt_links, con.taxonomy, con.taxonomy.level, con.lifestage, res.taxonomy, res.taxonomy.level, res.lifestage)
+sylt_links$foodweb.name <- "Sylt"
+sylt_links$web_study <- "Thieltges et al. (2011)"
+```
+```{r}
+# Flensburg
+flens_links <- read.csv("../../data/webs/ECOL_92_174/Flensburg_Data_Links.csv")
+flens_nodes <- read.csv("../../data/webs/ECOL_92_174/Flensburg_Data_Nodes.csv")
+
+flens_links <- filter(flens_links, LinkType == "Predation" | LinkType == "Detritivory")
+flens_links <- left_join(flens_links, select(flens_nodes, Node.ID, con.taxonomy = WorkingName, con.taxonomy.level = Resolution, con.lifestage = Stage),
+                         by = c("ConsumerNodeID" = "Node.ID"))
+flens_links <- left_join(flens_links, select(flens_nodes, Node.ID, res.taxonomy = WorkingName, res.taxonomy.level = Resolution, res.lifestage = Stage),
+                         by = c("ResourceNodeID" = "Node.ID"))
+flens_links <- select(flens_links, con.taxonomy, con.taxonomy.level, con.lifestage, res.taxonomy, res.taxonomy.level, res.lifestage)
+flens_links$foodweb.name <- "Flensburg"
+flens_links$web_study <- "Zander et al. (2011)"
+```
+```{r}
+# Quick pond
+qp_links <- read.csv("../../data/webs/ECOL_93_153/Data/Quick_Pond_Links.csv")
+qp_nodes <- read.csv("../../data/webs/ECOL_93_153/Data/Quick_Pond_Nodes.csv")
+
+qp_links <- filter(qp_links, LinkType == "predation" | LinkType == "detritivory")
+qp_links <- left_join(qp_links, select(qp_nodes, NodeID, con.taxonomy = WorkingName, con.taxonomy.level = Resolution, con.lifestage = Stage),
+                         by = c("ConsumerNodeID" = "NodeID"))
+qp_links <- left_join(qp_links, select(qp_nodes, NodeID, res.taxonomy = WorkingName, res.taxonomy.level = Resolution, res.lifestage = Stage),
+                         by = c("ResourceNodeID" = "NodeID"))
+qp_links <- select(qp_links, con.taxonomy, con.taxonomy.level, con.lifestage, res.taxonomy, res.taxonomy.level, res.lifestage)
+qp_links$foodweb.name <- "Quick Pond"
+qp_links$web_study <- "Preston et al. (2012)"
+```
+```{r}
+# Baja
+bsq_links <- read.table("../../data/webs/ECOL_92_66/BSQweb_Links.txt", header = T, sep = "\t")
+bsq_nodes <- read.csv("../../data/webs/ECOL_92_66/BSQ_nodes.csv")
+
+bsq_links <- filter(bsq_links, LinkType == "predation" | LinkType == "detritivory")
+bsq_links <- left_join(bsq_links, select(bsq_nodes, NodeID, con.taxonomy = WorkingName, con.taxonomy.level = Resolution, con.lifestage = Stage),
+                         by = c("ConsumerNodeID" = "NodeID"))
+bsq_links <- left_join(bsq_links, select(bsq_nodes, NodeID, res.taxonomy = WorkingName, res.taxonomy.level = Resolution, res.lifestage = Stage),
+                         by = c("ResourceNodeID" = "NodeID"))
+bsq_links <- select(bsq_links, con.taxonomy, con.taxonomy.level, con.lifestage, res.taxonomy, res.taxonomy.level, res.lifestage)
+bsq_links$foodweb.name <- "Bahía San Quintín"
+bsq_links$web_study <- "Hechinger et al. (2011)"
+```
+```{r}
+# Estero
+epb_links <- read.table("../../data/webs/ECOL_92_66/EPBweb_Links.txt", header = T, sep = "\t")
+epb_nodes <- read.csv("../../data/webs/ECOL_92_66/EPB_nodes.csv")
+
+epb_links <- filter(epb_links, LinkType == "predation" | LinkType == "detritivory")
+epb_links <- left_join(epb_links, select(epb_nodes, NodeID, con.taxonomy = WorkingName, con.taxonomy.level = Resolution, con.lifestage = Stage),
+                         by = c("ConsumerNodeID" = "NodeID"))
+epb_links <- left_join(epb_links, select(epb_nodes, NodeID, res.taxonomy = WorkingName, res.taxonomy.level = Resolution, res.lifestage = Stage),
+                         by = c("ResourceNodeID" = "NodeID"))
+epb_links <- select(epb_links, con.taxonomy, con.taxonomy.level, con.lifestage, res.taxonomy, res.taxonomy.level, res.lifestage)
+epb_links$foodweb.name <- "Estero de Punta Banda"
+epb_links$web_study <- "Hechinger et al. (2011)"
+```
+```{r}
+paras_fws <- bind_rows(otago_links, sylt_links, flens_links, qp_links, bsq_links, epb_links)
+rm(otago_links, sylt_links, qp_links, bsq_links, epb_links, flens_links,
+   otago_nodes, sylt_nodes, qp_nodes, bsq_nodes, epb_nodes, flens_nodes)
+paras_fws$autoID <- seq(from = max(brose19$autoID, na.rm=T)+1, to = max(brose19$autoID, na.rm=T) + length(paras_fws$con.taxonomy), by = 1)
+```
+
+```{r}
+brose19 <- bind_rows(brose19, paras_fws)
+```
+```{r}
+brose19 <- mutate(brose19, con.taxonomy.level = tolower(con.taxonomy.level))
+brose19$con.taxonomy.level[which(brose19$con.taxonomy.level == "genus ")] <- 'genus'
+brose19$con.taxonomy.level[which(brose19$con.taxonomy.level == "infraorder")] <- 'order'
+```
+
+There are this many consumer-resource links in the compilation: 
+
+```{r}
+length(brose19$autoID)
+```
+
+From this many foodwebs:
+
+```{r}
+n_distinct(brose19$foodweb.name)
+```
+
+For every link, I calculated the minimum number of steps until reaching a basal resource in the food web. A basal resource was one that was in the web only as resource not as a consumer.
+
+```{r}
+fws_arr <- group_by(brose19, foodweb.name)%>%
+  summarize(n = n())%>%
+  arrange(desc(n))
+```
+```{r}
+brose19TL <- brose19
+brose19TL$TL <- NA
+fws <- fws_arr$foodweb.name
+for(fw in fws){
+  # print(fw)
+  # loop through food webs
+  fw_ds <- filter(brose19, foodweb.name == fw) # data for food web
+  basal_spp <- unique(fw_ds$res.taxonomy)[!unique(fw_ds$res.taxonomy) %in% fw_ds$con.taxonomy] # basal spp in food web
+  
+  # for each food web, loop through links
+  for(i in seq_along(fw_ds$con.taxonomy)){
+    tl <- 2
+    lk <- fw_ds[i,]
+    res <- lk$res.taxonomy
+    while(sum(res %in% basal_spp)==0){ # add tl until reach basal spp
+      tl <- tl + 1
+      res <- filter(fw_ds, con.taxonomy %in% res)$res.taxonomy
+      if(tl > 8){ # if TL gets too high, you're in a loop, break out
+        tl <- NA
+        break
+      } 
+    }
+    fw_ds$TL[i] <- tl
+  }
+  
+  mv <- match(brose19TL$autoID, fw_ds$autoID)
+  brose19TL$TL[which(!is.na(mv))] <- fw_ds$TL[na.omit(mv)]
+}
+```
+
+```{r}
+  # basal_spp <- unique(fw_ds$res.taxonomy)[!unique(fw_ds$res.taxonomy) %in% fw_ds$con.taxonomy]
+  # brose19$TL[which(brose19$res.taxonomy %in% basal_spp & brose19$foodweb.name == fw)] <- 2 # consumers that eat basal spp
+  # 
+  # prim_cons <- brose19$con.taxonomy[which(brose19$TL == 2 & brose19$foodweb.name == fw)] # list of prim consumers
+  # brose19$TL[which(brose19$res.taxonomy %in% prim_cons & brose19$foodweb.name == fw)] <- 3 # consumers that eat primary consumers
+  # 
+  # sec_cons <- brose19$con.taxonomy[which(brose19$TL == 3 & brose19$foodweb.name == fw)] # secondary consumers
+  # brose19$TL[which(brose19$res.taxonomy %in% sec_cons & brose19$foodweb.name == fw)] <- 4 # eat secondary consumers
+```
+
+For every consumer in each food web, I averaged across prey items to get an average trophic level estimate (this assumes that prey are consumed equally). I also calculated a short-weighted version of trophic level by averaging a consumer's mean and minimum trophic level. Finally, I also calculated diet breadth and vulnerability for every consumer.
+
+```{r}
+brose19TL <- group_by(brose19TL, con.taxonomy, foodweb.name)%>%
+  summarize(avg_TL = mean(TL, na.rm = T), min_TL = min(TL, na.rm = T),
+            diet_breath = length(unique(res.taxonomy)),
+            bm = mean(con.mass.mean.g., na.rm = T))%>%
+  mutate(sw_TL = (avg_TL + min_TL)/2)
+```
+```{r}
+brose19TL$avg_TLcat <- cut(brose19TL$avg_TL, breaks = c(2, 2.5, 3, 3.5, 4, 4.5), include.lowest = T)
+```
+```{r}
+brose19TL2 <- group_by(brose19, res.taxonomy, foodweb.name)%>% # group by resource, calculate vulnerability
+  summarize(vulnerability = length(unique(con.taxonomy)))
+brose19TL <- left_join(brose19TL, select(brose19TL2, con.taxonomy = res.taxonomy, foodweb.name, vulnerability)) # combine with consumer-based table
+rm(brose19TL2)
+```
+
+```{r}
+# add a resolution variable to main dataset
+res_var <- select(brose19, con.taxonomy, con.taxonomy.level, foodweb.name)%>%distinct()
+brose19TL <- left_join(brose19TL, res_var)
+brose19TL <- mutate(brose19TL, con.taxonomy.level = factor(con.taxonomy.level, levels = c('species', 'genus', 'family', 'order', 'class', 'assemblage')))
+```
+```{r}
+brose19TL <- left_join(brose19TL, select(brose19, foodweb.name, web_study)%>%distinct()) # add web study var to TL dataframe
+```
+
+There are this many unique consumers in the data:
+
+```{r}
+n_distinct(brose19TL$con.taxonomy)
+```
+
+As a quality check on my trophic level calculations, I plot the distribution of trophic levels. There are about 4 peaks in the distibution of consumer trophic level across all the webs. First, there are pure herbivores at TL = 2. Then, there is a group of omnivores around TL = 2.5. The next peak is at TL = 3, pure secondary consumers. Finally, there is a peak at just over 3.5, which represents the tertiary consumers, which consume both primary and secondary consumers.
+
+```{r}
+ggplot(brose19TL, aes(x = avg_TL)) +
+  geom_histogram(binwidth = 0.1) +
+  labs(x = "Average TL")
+```
+
+The average TL calculation assumes that all prey are consumed equally, but in reality lower-level prey are probably consumed more frequently (i.e. more energy flows via short chains than long chains). Thus, I also calculate a short-chain weighted trophic level, which shift the distribution left. This variable is also multimodal, with a peak at TL = 2 (primary consumers), less omnivory (i.e. no peak at 2.5), and another peak between 3 and 3.5 (secondary consumers).
+
+```{r}
+ggplot(brose19TL, aes(x = sw_TL)) +
+  geom_histogram(binwidth = 0.1) +
+  labs(x = "Short-weighted TL")
+```
+
+As a second quality check on my trophic level calculations, I plot trophic level vs body mass, both splines and linear relations. The relationship tends to be positive in the 9 most link-dense webs, which is reassuring, but not always. There's a lot of variation. Note that the plot leaves out all primary producers.
+
+```{r}
+ggplot(filter(brose19TL, foodweb.name %in% fws[1:9]),
+       aes(y = bm, x = avg_TL, color = foodweb.name)) +
+  geom_smooth() +  geom_smooth(method = lm, linetype = 'dotted') +
+  scale_y_log10() +
+  guides(color = FALSE) +
+  facet_wrap(~foodweb.name, nrow = 3, scales = 'free_y') +
+  labs(x = "Average TL", y = "Body mass")
+```
+
+Many food webs in the compilation may not be relevant to trophic transmission, such as if the web is focused on plant-herbivore interactions. Let's look at the median trophic level of the consumers in the webs. There is a large peak of webs with TL = 2. These webs mainly have primary consumers and few secondary consumers.
+
+```{r}
+fw_avg_tl <- group_by(brose19TL, foodweb.name, web_study)%>%
+  summarize(fw_tl = median(avg_TL, na.rm=T), n = n(), bm = median(bm, na.rm = T))
+ggplot(fw_avg_tl, aes(x = fw_tl)) + geom_histogram(binwidth = 0.1) + labs(x = "Median TL for web")
+```
+
+The median web in the compilation had a trophic level of:
+
+```{r}
+round(median(fw_avg_tl$fw_tl), 2)
+```
+```{r}
+# ggplot(fw_avg_tl, aes(x = log10(bm))) + geom_histogram() + labs(x = "Median body mass of consumer in web")
+```
+
+We may also prefer to focus on webs with more consumers, which are presumably more resolved and complete. In fact, web trophic level and web richness are related, though imperfectly. The dashed red lines on the plot are the median values. Webs falling in the upper right quadrant represent the most rich webs with more higher level consumers. 
+
+```{r}
+ggplot(fw_avg_tl, aes(x = n, y = fw_tl)) +
+  geom_point(alpha = 0.2) +
+  geom_hline(yintercept = median(fw_avg_tl$fw_tl), color = 'red', linetype = 'dashed') +
+  geom_vline(xintercept = median(fw_avg_tl$n), color = 'red', linetype = 'dashed') +
+  scale_x_log10() +
+  labs(x = "Number of consumers", y = "Median web trophic level")
+```
+
+In addition to richness and trophic level, webs that involve larger animals may be more relevant to helminths, because they are likely to include more vertebrates. Here is median consumer mass vs median trophic level for the webs. Webs with higher-level consumers tend to be larger-bodied, but there is also a cluster of small-bodied webs with high trophic levels (these are soil invertebrate webs).
+
+```{r}
+ggplot(fw_avg_tl, aes(y = fw_tl, x = log10(bm))) +
+  geom_point(alpha = 0.2, aes(size = n)) +
+  geom_hline(yintercept = median(fw_avg_tl$fw_tl), color = 'red', linetype = 'dashed') +
+  geom_vline(xintercept = log10(median(fw_avg_tl$bm, na.rm=T)), color = 'red', linetype = 'dashed') +
+  # scale_x_log10() +
+  labs(x = "Median web consumer mass (log)", y = "Median web trophic level", size = "Consumers")
+```
+
+It is unclear which of these three variables (consumers, trophic level, body mass) should be prioritized for selecting webs. Thus, I manually went through the 290 webs in the compilation and I took the ones that included some vertebrates as potentially relevant for trophically-transmitted helminths (helminths usually reproduce in vertebrates).
+
+```{r}
+webs_with_verts <- c("Cattin Blandenier (2004)", "Cohen et al. (2009)", "Ekloef et al. (2013)", "Gray et al. (2015), Thompson et al. (2017)",
+                        "Jacob et al. (2011)", "Jacob et al. (2015)", "Jonsson et al. (2005)", "Kefi et al. (2015)", "Kroll, unpublished ",
+                        "Lafferty et al. (2006)", "Layer et al. (2010)", "Legagneux et al. (2014)", "Mendonca et al. (2018)", "Nsiku (1999)",
+                        "O'Gorman et al. (2012)", "Opitz (1996)", "Sutherland (1989), Havens (1992)", "Townsend et al. (1998)", 
+                     "Mouritsen et al. (2011)", "Thieltges et al. (2011)","Zander et al. (2011)", "Preston et al. (2012)","Hechinger et al. (2011)")
+
+most_relevant_studies <- c("Cattin Blandenier (2004)", "Cohen et al. (2009)", "Ekloef et al. (2013)", 
+                        "Jacob et al. (2011)", "Jacob et al. (2015)", "Kroll, unpublished ",
+                        "Lafferty et al. (2006)", "Legagneux et al. (2014)", "Opitz (1996)", "Sutherland (1989), Havens (1992)",
+                        "Mouritsen et al. (2011)", "Thieltges et al. (2011)", "Zander et al. (2011)", "Preston et al. (2012)", "Hechinger et al. (2011)")
+most_relevant_studies2 <- c("Cohen et al. (2009)", "Ekloef et al. (2013)", 
+                        "Jacob et al. (2011)", "Jacob et al. (2015)", "Lafferty et al. (2006)", 
+                        "Mouritsen et al. (2011)", "Thieltges et al. (2011)", "Preston et al. (2012)", "Hechinger et al. (2011)") #"Zander et al. (2011)"
+
+```
+
+```{r}
+fw_avg_tl_red <- filter(fw_avg_tl, web_study %in% webs_with_verts)%>%
+  arrange(desc(n))
+fws <- fw_avg_tl_red$foodweb.name
+```
+
+After filtering the webs by these criteria, there are this many webs remaining:
+
+```{r}
+length(fw_avg_tl_red$foodweb.name)
+```
+
+For each consumer in each web, I also want to calculate the number of lower-level consumers that are part of the various chains leading to a given consumer, because these represent potential intermediate hosts. To that end, I made a dataframe that lists all the lower-level consumers leading to a given 'target' consumer in each foodweb.
+
+```{r}
+# create empty dataframe to collect results
+chains <- filter(brose19, foodweb.name == "blah")%>%
+  select(fw = foodweb.name, target_consumer = con.taxonomy.level, cons = con.taxonomy, res = res.taxonomy)
+
+for(fw in fws){
+  # print(fw)
+
+  # loop through food webs
+  fw_ds <- filter(brose19, foodweb.name == fw) # data for food web
+  basal_spp <- unique(fw_ds$res.taxonomy)[!unique(fw_ds$res.taxonomy) %in% fw_ds$con.taxonomy] # basal spp in food web
+  
+  for(consumer in unique(fw_ds$con.taxonomy)){
+    # loop through consumers in each web - select just consumer and its resources
+    ds_out <- filter(fw_ds, con.taxonomy == consumer)%>% 
+      select(cons = con.taxonomy, res = res.taxonomy)
+    
+    ds <- ds_out
+    i <- 0
+    while(dim(ds)[1] != 0){ # loop through resources until none more are found (i.e. all basal)
+      i <- i+1
+      # select the links where the consumer's resources are the consumers
+      ds <- filter(fw_ds, con.taxonomy %in% ds$res)%>%
+        select(cons = con.taxonomy, res = res.taxonomy)%>%
+        filter(cons != res) # exclude cannibalism where consumer = resource
+      ds_out <- bind_rows(ds_out, ds) # add "resources of resources" as rows to data
+      
+      if(i > 6) { # if more than 6 steps down to basal spp, probably stuck in loop
+        break
+      }
+    }
+    
+    # output is all resources in chains below consumer
+    ds_out$fw <- fw
+    ds_out$target_consumer <- consumer
+    ds_out <- filter(ds_out, !res %in% basal_spp) # exclude basal spp
+    ds_out <- ds_out%>%distinct() # only take distinct combos
+    
+    chains <- bind_rows(chains, ds_out) # combine with out dataframe
+  }
+  
+}
+```
+```{r}
+# head(chains, 100)
+```
+
+```{r}
+chains_uniq_res <- group_by(chains, target_consumer, fw)%>%
+  summarize(pot_hosts = n_distinct(res)) # number of non-basal resources that can lead to consumer
+```
+```{r}
+brose19TL <- left_join(filter(brose19TL, foodweb.name %in% fws), # only best food webs
+          select(chains_uniq_res, con.taxonomy = target_consumer, foodweb.name = fw, pot_hosts))
+```
+
+The number of hosts used by trophically-transmitted helminths with complex life cycles is shaped by two factors: the number of upstream hosts (potential next hosts) and the number of downstream hosts (potential intermediate hosts that aid transmission). Both vary with trophic level. We'll start by looking at the first pattern: how the number of consumers decreases with trophic level (i.e. the trophic pyramid - fewer species of top predators than primary consumers).
+
+```{r}
+brose19TL$sw_TLcat <- cut(brose19TL$sw_TL, breaks = c(2, 2.5, 3, 3.5, 4, 4.5), include.lowest = T)
+```
+
+# Diversity vs trophic level
+
+Here is the number of consumers in 0.5 trophic level categories across all food webs. It decreases, but I'm somewhat surprised there are so few top predators (TL above 4).
+
+```{r}
+ggplot(filter(brose19TL, !is.na(avg_TLcat)),
+       aes(x = avg_TLcat, fill = con.taxonomy.level)) +
+  geom_bar() +
+  labs(fill = 'resolution', x = "Average TL, grouped")
+```
+
+Here's what this pattern looks like in the 9 most link-dense webs. In some, there is a clear negative trend, but in others there's no trend or even a positive one.
+
+```{r}
+ggplot(filter(brose19TL, foodweb.name %in% fws[1:9], !is.na(avg_TLcat)),
+       aes(x = avg_TLcat, fill = con.taxonomy.level)) +
+  geom_bar() +
+  labs(fill = 'resolution', x = "Average TL, grouped") +
+  facet_wrap(~foodweb.name, nrow = 3, scales = 'free_y')
+```
+
+```{r}
+hd_grouped <- group_by(brose19TL, foodweb.name, web_study, avg_TLcat)%>%
+  summarize(n = n())
+```
+
+Here's a plot with each foodweb indicated by a separate path. This plot also shows how there are fewer omnivores (feed on multiple trophic levels) than discrete consumers. This is exemplified by the dip at TL = 2.5 followed by an increase at TL = 3. 
+
+```{r}
+ggplot(filter(hd_grouped, !is.na(avg_TLcat)),
+       aes(x = avg_TLcat, y = n)) +
+  geom_line(aes(group = foodweb.name), alpha = 0.3) +
+  scale_y_log10() +
+  labs(y = 'Species', x = "Average TL, grouped")
+```
+
+Maybe we can categorize consumers into more discrete categories: (1) TL < 2.5 (herbivore or omnivore that gets most its energy from primary producers), (2) 2.5 < TL < 3.5 (get most energy from eating primary consumers), and (3) TL > 3.5 (gets most energy from eating secondary consumers).
+
+```{r}
+brose19TL <- mutate(brose19TL, sw_TLcat2 = if_else(sw_TL < 2.5, "2", 
+                                                   if_else(sw_TL <= 3.5, "3", "4")))%>%
+  mutate(avg_TLcat2 = if_else(avg_TL < 2.5, "2", 
+                              if_else(avg_TL <= 3.5, "3", "4")))
+```
+
+With these categories, the decline in species diversity with trophic level is clearer as there is not a "dip" due to omnivory. However, there is a subset of webs where diversity increases with trophic level. 
+
+```{r}
+hd_grouped <- group_by(brose19TL, foodweb.name, web_study, avg_TLcat2)%>%
+  summarize(n = n())
+ggplot(filter(hd_grouped, !is.na(avg_TLcat2)),
+       aes(x = avg_TLcat2, y = n)) +
+  geom_line(aes(group = foodweb.name), alpha = 0.3) +
+  scale_y_log10() +
+  labs(y = 'Species', x = "Average TL, grouped")
+```
+
+Turns out these are almost all soil invertebrate webs from a single study.
+
+```{r}
+hd_grouped <- mutate(hd_grouped, study = if_else(web_study %in% most_relevant_studies, "more relevant", "less relevant"))
+```
+```{r}
+ggplot(filter(hd_grouped, !is.na(avg_TLcat2)),
+       aes(x = avg_TLcat2, y = n)) +
+  geom_line(aes(group = foodweb.name, color = study), alpha = 0.3) +
+  scale_y_log10() +
+  labs(y = 'Species', x = "Average TL, grouped")
+```
+
+So in general these plots look consistent with a trophic pyramid (i.e. species diversity decreasing with trophic level). Let's formalize it in a model. I took the number of consumers in 1 TL increments as my response variable, and then looked to quantify how it changes as trophic level increases. I fit a generalized linear mixed model (poisson errors for counts) that also accounted for differences in species richness between food webs. I exclude the soil webs from Digel et al. since they seem to be quite different than the remaining webs.
+
+```{r}
+# hd_grouped <- mutate(hd_grouped, TL_cat2 = as.integer(sw_TLcat))%>%
+#   mutate(TL_cat2 = if_else(TL_cat2 == 1, 0, # TL of 2 set to zero, so model intercept is at TL = 2
+#                            if_else(TL_cat2 == 2, 0.5, 
+#                                    if_else(TL_cat2 == 3, 1, 
+#                                            if_else(TL_cat2 == 4, 1.5, 2)))))
+hd_grouped <- mutate(hd_grouped, TL_cat2 = if_else(avg_TLcat2 == "2", 0, # TL of 2 set to zero, so model intercept is at TL = 2
+                                                   if_else(avg_TLcat2 == "3", 1, 2)))
+```
+
+In the remaining 82 webs, on average, the number of species decreased by 57% with each TL increase. Note: this decrease is more pronounced with short-weight TL, because short-weight TL is shifted left relative to averge TL, which makes the slope steeper). 
+
+```{r}
+library(lme4)
+```
+```{r}
+mod0 <- glmer(n ~ TL_cat2 + (1|foodweb.name), 
+              data = filter(hd_grouped, web_study %in% webs_with_verts),
+              family = 'poisson')
+summary(mod0)
+```
+
+The model is much improved by letting each food web have its own species diversity by trophic level slope. The averge decrease is about the same in this model, though the associated standard error is also much higher.
+
+```{r}
+mod1 <- glmer(n ~ TL_cat2 + (TL_cat2|foodweb.name), 
+              data = filter(hd_grouped, web_study %in% webs_with_verts),
+              family = 'poisson')
+# anova(mod0, mod1)
+summary(mod1)
+```
+
+
+In addition to using `foodweb` as the random effect, I can also include study, because some studies published multiple webs from comparable ecosystems. Adding this random effect improves the model (webs from the same study have similar diversity), but the diversity by trophic level slope is about the same.
+
+```{r}
+modx <- glmer(n ~ TL_cat2 + (TL_cat2|foodweb.name) + (1|web_study), 
+              data = filter(hd_grouped, web_study %in% webs_with_verts),
+              family = 'poisson')
+summary(modx)
+```
+
+
+```{r}
+# Here's the distribution of slopes across food webs. In some webs, diversity increases with trophic level, while in others it decreases. Thus, it is important to keep in mind there are fundamental differences between the webs in this compilation.
+
+# re <- ranef(modx)$foodweb.name
+# re$fw <- row.names(re)
+# ggplot(re, aes(TL_cat2)) +
+#   geom_histogram(binwidth = 0.2) +
+#   labs(x = "Slope - diversity vs trophic level")
+```
+
+```{r}
+# filter(re, TL_cat2 > 1)%>%arrange(TL_cat2)
+# filter(re, TL_cat2 < -1)%>%arrange(TL_cat2)
+```
+
+Thus, the decrease in species diversity with trophic level is well-supported in empirical webs. As worms move up food webs, the number of upstream hosts decreases.
+
+Now let's look in the other direction. As worms move up food webs, the paths (trophic chains) to a given host increases, because animals that occupy higher trophic levels have more resources below them. 
+
+# Number of resources in chains leading to a consumer
+
+For each consumer, we calculated the number of resources in chains leading to the consumer. Here's the plot. It is positive as expected, though the dips in the spline again hint at how TL is a discontinuous variable. It is also not obvious that the soil webs differ from the other webs.
+
+```{r}
+brose19TL <- mutate(brose19TL, study = if_else(web_study %in% most_relevant_studies, "more relevant", "less relevant"))
+```
+```{r}
+ggplot(brose19TL, aes(y = pot_hosts, x = avg_TL, color = study)) +
+  geom_point(alpha = 0.1) +
+  geom_smooth( se = F) +
+  scale_y_log10() +
+  guides(group = FALSE) +
+  labs(y = 'Total lower-level resources', x = "Average TL")
+```
+
+It also seems to be positive within webs, though it varies.
+
+```{r}
+ggplot(filter(brose19TL, foodweb.name %in% fws[1:9]),
+       aes(y = pot_hosts, x = sw_TL, color = foodweb.name)) +
+  geom_smooth() +
+  geom_smooth(method = 'lm', linetype = 'dashed') +
+  scale_y_log10() +
+  guides(color = FALSE) +
+  facet_wrap(~foodweb.name, nrow = 3, scales = 'free_y') +
+  labs(y = 'Total lower-level resources', x = "Average TL")
+```
+
+Again, we'll fit a mixed model in which each food web can have a different relationship between lower-level resources and trophic level. We exclude the soil invertebrate webs for consistency. This model indicates that the total resources leading to a given consumer increases by 105% with each unit increase in trophic level. This slope is lower when using short-weighted TL, because short weighting shifts omnivores towards herbivores, given they have comparable numbers of resources, weakens the relationship. 
+
+```{r}
+add_study <- select(brose19, foodweb.name, web_study)%>%distinct()
+brose19TL <- left_join(brose19TL, add_study)
+brose19TL <- mutate(brose19TL, avg_TLcen = avg_TL - 2)
+```
+```{r}
+# mod0 <- glmer(pot_hosts ~ sw_TL + (1|foodweb.name), data = brose19TL, family = 'poisson')
+# summary(mod0)
+mod1 <- glmer(pot_hosts ~ avg_TLcen + (avg_TLcen|foodweb.name) + (1|web_study), 
+              data = filter(brose19TL), 
+              family = 'poisson')
+# anova(mod0, mod1)
+summary(mod1)
+# plot(mod1)
+```
+
+```{r}
+## #The distribution of random slopes is ok; it looked much worse with the Digel et al studies
+
+# re <- ranef(mod1)$foodweb.name
+# re$fw <- row.names(re)
+# re <- mutate(re, study = if_else(grepl("AEW", fw) | grepl("HEW", fw) | grepl("SEW", fw),
+#                                                      "Digel et al. 2014", "other"))
+# ggplot(re, aes(sw_TL)) +
+#   geom_histogram(binwidth = 0.2) + 
+#   labs(x = "Slope - total resources vs trophic level") +
+#   facet_wrap(~study, ncol = 1)
+```
+
+All in all, our second trend, an increase in potential intermediate hosts with trophic level also appears well supported. 
+
+# Number of consumers 'reachable' from single starting point
+
+We can approach the problem from the other direction. Starting with a single host, how many next hosts might there be? And how many predators do those hosts have? How does potential host range expand with each trophic step away from a single host.
+
+I create a data table with, for each consumer, the number of predators, predators of predators and so on.
+
+```{r}
+# create empty dataframe to collect results
+chains2 <- filter(brose19, foodweb.name == "blah")%>%
+  select(fw = foodweb.name, target = con.taxonomy.level, 
+         second_hosts = con.taxonomy, third_hosts = res.taxonomy, fourth_hosts = res.taxonomy.level)%>%
+  mutate(second_hosts = as.integer(second_hosts),
+         third_hosts = as.integer(second_hosts),
+         fourth_hosts = as.integer(second_hosts))
+
+for(fw in fws){
+  print(fw)
+  
+  # loop through food webs
+  fw_ds <- filter(brose19, foodweb.name == fw) # data for food web
+  basal_spp <- unique(fw_ds$res.taxonomy)[!unique(fw_ds$res.taxonomy) %in% fw_ds$con.taxonomy] # basal spp in food web
+  
+  for(consumer in unique(fw_ds$con.taxonomy)){
+    # for each consumer, get it's predators, exclude cannibalism
+    ds <- filter(fw_ds, res.taxonomy == consumer, con.taxonomy != res.taxonomy)
+    predators <- unique(ds$con.taxonomy)
+    sec_hosts <- length(predators)
+    
+    # take another two steps up food web, record number of hosts
+    for(i in 1:2){
+      ds <- filter(fw_ds, res.taxonomy %in% predators, con.taxonomy != res.taxonomy)
+      predators <- unique(ds$con.taxonomy)
+      if(i == 1){
+        third_hosts <- length(predators)
+      } else {
+        fourth_hosts <- length(predators)
+      }
+    }
+    
+    ds_out <- data.frame(fw = fw, target = consumer, 
+                         second_hosts = sec_hosts, third_hosts = third_hosts, fourth_hosts = fourth_hosts)
+    chains2 <- bind_rows(chains2, ds_out)
+    }
+}
+```
+```{r}
+brose19TL <- left_join(brose19TL, 
+                       select(chains2, con.taxonomy = target, foodweb.name = fw,
+                              second_hosts, third_hosts, fourth_hosts))
+brose19TL <- mutate(brose19TL, tot_upstream = second_hosts + third_hosts + fourth_hosts)
+```
+
+In most webs, we can see that low-trophic level consumers have more potential next hosts, as expected.
+
+```{r}
+ggplot(brose19TL, aes(x = sw_TL, y = tot_upstream)) + 
+  geom_point(alpha = 0.1) +
+  geom_smooth(se=F) + 
+  facet_wrap(~web_study, scales = 'free')
+```
+
+If a consumer has many direct predators (TL+1), then it has more predators of its predators (TL+2), consistent with the notion that there is a 'radiation' of generalism.
+
+```{r}
+ggplot(brose19TL, aes(x = second_hosts, y = third_hosts)) + 
+  geom_point(alpha = 0.1) +
+  geom_smooth(se=F) +
+  facet_wrap(~web_study, scales = 'free') +
+  labs(x = "Hosts, TL+1", "Hosts, TL+2")
+```
+
+I rearrange the data table to calculate the cumulative number of hosts with each trophic step.
+
+```{r}
+chains2$first_hosts <- 1 
+chains2_l <- gather(chains2, key = "steps", value = "hosts", 3:6)
+chains2_l <- group_by(chains2_l, target, fw)%>%
+  mutate(steps = factor(steps, levels = c("first_hosts", "second_hosts", "third_hosts", "fourth_hosts")))%>%
+  arrange(target, fw, steps)%>%
+  mutate(cum_hosts = cumsum(hosts), step_int = as.integer(steps)-1)
+chains2_l <- left_join(chains2_l, 
+                       select(ungroup(brose19TL), target = con.taxonomy, sw_TL,
+                              fw = foodweb.name, web_study)%>%distinct())
+```
+
+Now, we look at how potential hosts accumulate with each trophic step. Here, I plot low-trophic level hosts from the most relevant food webs. With each transmission event, more hosts are encountered. 
+
+```{r}
+ggplot(filter(chains2_l, sw_TL < 2.2, web_study %in% most_relevant_studies2),
+       aes(x = step_int, y = cum_hosts)) +
+  geom_point(alpha = 0.1) + geom_line(aes(group = paste(target,fw)), alpha = 0.1) +
+  # geom_smooth(color = 'red', se = F) +
+  # scale_y_log10() +
+  facet_wrap(~web_study, scales = 'free') +
+  labs(x = "Trophic steps", y = "Cumulative potential hosts")
+```
+
+The increase is not quite exponential, though, because when we log-transform the y-axis, the rate of increase plateaus, as we run out of predators at higher trophic levels.
+
+```{r}
+ggplot(filter(chains2_l, sw_TL < 2.2, web_study %in% most_relevant_studies2),
+       aes(x = step_int, y = cum_hosts)) +
+  geom_point(alpha = 0.1) + geom_line(aes(group = paste(target,fw)), alpha = 0.1) +
+  # geom_smooth(color = 'red', se = F) +
+  scale_y_log10() +
+  facet_wrap(~web_study, scales = 'free') +
+  labs(x = "Trophic steps", y = "Cumulative potential hosts")
+```
+
+When we model this relationship, we find a slope less than 1, and it is very similar to the species accumulation curve slope below (0.76). This is reassuring, but it also does not get at how much generalism might 'radiate' if unconstrained by food web structure (i.e. the lack of higher level hosts).
+
+```{r}
+t1 <- glmer(cum_hosts ~ step_int + (1|fw) + (step_int|target),
+            data = filter(chains2_l, sw_TL < 2.2, step_int < 4), 
+            family = 'poisson')
+summary(t1)
+```
+
+If we restrict ourselves to the lowest part of the food web, just the first trophic step above the base, then we get a much steeper slope, as expected.
+
+```{r}
+t1 <- glmer(cum_hosts ~ step_int + (1|fw) + (step_int|web_study),
+            data = filter(chains2_l, sw_TL < 2.2, step_int < 4), 
+            family = 'poisson')
+summary(t1)
+```
+
+
+# Number of consumers 'reachable' from multiple starting point
+
+How do we put this all together?
+
+If we expand the number of low-level consumers that parasites can infect as first hosts, how might that affect the expected relationship?
+
+
+
+```{r}
+# create empty dataframe to collect results
+chains3 <- filter(brose19, foodweb.name == "blah")%>%
+  select(fw = foodweb.name, first_hosts = con.mass.mean.g.)%>% 
+  mutate(first_hosts = as.integer(first_hosts), second_hosts = as.integer(first_hosts),
+         third_hosts = as.integer(first_hosts), fourth_hosts = as.integer(first_hosts))
+
+for(fw in fws){
+  print(fw)
+  
+  # loop through food webs
+  fw_ds <- filter(brose19, foodweb.name == fw) # data for food web
+  basal_spp <- unique(fw_ds$res.taxonomy)[!unique(fw_ds$res.taxonomy) %in% fw_ds$con.taxonomy] # basal spp in food web
+  low_lev_cons <- filter(brose19TL, foodweb.name == fw, sw_TL <= 2.25)$con.taxonomy # take all consumers in web that get >50% of E from primary producers
+  num_low_lev_cons <- length(low_lev_cons)
+  
+  for(x in 1:5){
+  # loop through different numbers of consumers
+  for(c in 1:num_low_lev_cons){
+    first_hosts <- c
+    start_consumers <- sample(low_lev_cons, size = c) # sample consumers of given size
+    hosts <- start_consumers
+    # take 3 steps up the food web from the base
+    for(i in 1:3){
+      # for each set of starting consumer, get their predators, exclude cannibalism
+      ds <- filter(fw_ds, res.taxonomy %in% start_consumers, con.taxonomy != res.taxonomy)
+      predators <- unique(ds$con.taxonomy)
+      predators <- predators[!predators %in% hosts] # only take predators not already represented in host list
+      
+      if(i == 1){
+        second_hosts <- length(predators)
+      } else if(i == 2) {
+        third_hosts <- length(predators)
+      } else {
+        fourth_hosts <- length(predators)
+      }
+      # after recording number of potential next hosts, assign these predators to be starting consumers for next iteration
+      start_consumers <- predators
+      hosts <- unique(c(hosts, predators)) # update host list
+    }
+    ds_out <- data.frame(fw = fw, first_hosts = first_hosts, second_hosts = second_hosts, third_hosts = third_hosts, fourth_hosts = fourth_hosts)
+    chains3 <- bind_rows(chains3, ds_out)
+  }
+  }
+}
+```
+
+```{r}
+chains3 <- chains3%>%
+  mutate(index = 1:length(chains3$first_hosts))
+
+chains3_l <- chains3%>%
+  gather(key = "steps", value = "hosts", 2:5)%>%
+  mutate(steps = factor(steps, levels = c("first_hosts", "second_hosts", "third_hosts", "fourth_hosts")))%>%
+  group_by(fw, index)%>%
+  arrange(fw, index)%>%
+  mutate(cum_hosts = cumsum(hosts), step_int = as.integer(steps)-1)
+chains3_l <- left_join(chains3_l, select(ungroup(brose19TL), fw = foodweb.name, web_study)%>%distinct())
+chains3_l <- left_join(chains3_l, select(chains3, index, first_hosts))
+chains3_l <- left_join(chains3_l, chains3%>%group_by(fw)%>%summarize(max_prim_consumers = max(first_hosts)))
+chains3_l <- left_join(chains3_l, chains3_l%>%group_by(fw, index)%>%summarize(tot_hosts = max(cum_hosts)))
+
+```
+```{r}
+chains3_l <- mutate(chains3_l, prop_pot_first_hosts = first_hosts/max_prim_consumers)
+chains3_l <- mutate(chains3_l, prop_hosts_per_stage = hosts/tot_hosts)
+```
+
+```{r}
+ggplot(filter(chains3_l,web_study %in% most_relevant_studies2),
+       aes(x = steps, y = hosts, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.1) +
+  facet_wrap(~web_study, scales = 'free_y') +
+  labs(color = "Percent potential first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu')
+```
+
+```{r}
+ggplot(chains3_l, aes(x = step_int, y = cum_hosts, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.1) +
+  facet_wrap(~web_study, scales = 'free_y') +
+  labs(color = "Percent potential first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu')
+```
+
+```{r}
+ggplot(filter(chains3_l, hosts!=0, web_study %in% most_relevant_studies2),
+       aes(x = step_int, y = cum_hosts)) +
+  geom_line(aes(group = index, color = prop_pot_first_hosts), alpha = 0.1) +
+  # geom_smooth(formula = y ~ exp(2 + 0.3*x), color = 'black') +
+  facet_wrap(~web_study, scales = 'free_y') +
+  scale_color_distiller(type = 'div', palette = 'RdBu')
+```
+
+
+```{r}
+t1 <- glmer(cum_hosts ~ step_int + (1|web_study) + (1|index),
+            data = filter(chains3_l, hosts != 0,  prop_pot_first_hosts < 0.1), 
+            family = 'poisson')
+summary(t1)
+```
+```{r}
+t1 <- glmer(cum_hosts ~ step_int  + (1|web_study) + (1|index),
+            data = filter(chains3_l, hosts != 0, prop_pot_first_hosts > 0.9), 
+            family = 'poisson')
+summary(t1)
+```
+
+```{r}
+ggplot(chains3_l, aes(x = steps, y = prop_hosts_per_stage, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.2) +
+  facet_wrap(~web_study) +
+  scale_color_distiller(type = 'div', palette = 'RdBu')
+```
+
+
+
+
+We thus have two counteracting trends that may influence the relationship between parasite generalism and life cycle length: the number of upstream hosts decreases with trophic level while the number of downstream hosts increases with trophic level. The relative strengths of these trends should determine the relationship between parasite life cycle length, transmission opportunities, and generalism.
+
+# Putting the two trends together
+
+The simplest way to put the two trends together is just to compare the slopes. Downstream resources increase with trophic level faster than upstream consumer diversity decreases with trophic level. Thus, the overall trend is positive but less than 1 - it was ~0.5. For complex life cycle parasites moving up food webs, this suggests they might contact 50% more hosts with each trophic step they add to their life cycle.
+
+One concern, though, is that I calculated these trends at different levels. To calculate the diversity by trophic level relationship, I aggregated by trophic level within webs. By contrast, the lower-level resources by trophic level relationship was calculated at the level of consumer/species. I can't calculate species diversity at the level of individual consumers, but I can look at how resources scale with trophic level. 
+
+For parasites with complex life cycles, we are interested in how much the potential host range increases with each step in the life cycle (each trophic level). Essentially, we would like to know how much total species diversity increases with each trophic level. To do this, I calculated the cumulative sum of consumers across trophic levels within each web (diversity at current trophic level + diversity at lower levels). 
+
+The accumulation of species with TL appears relatively consistent across webs.
+
+```{r}
+hd_grouped <- hd_grouped%>%
+  arrange(foodweb.name, avg_TLcat2)%>%
+  mutate(cum_res = cumsum(n)) # with grouped df, cumulative sums are within food webs
+```
+```{r}
+ggplot(filter(hd_grouped, !is.na(avg_TLcat2)),
+       aes(y = cum_res, x = avg_TLcat2)) +
+  geom_line(aes(group = foodweb.name, color = study)) +
+  scale_y_log10() +
+  labs(y = 'Cumulative number of consumers', x = "Average TL, grouped")
+```
+
+When we fit a mixed model to quantify the average increase across webs (excluding the soil webs), we find that the total number of consumers in a web increases by about 45% with each trophic level. This fits relatively closely with the simple combination of slopes, which was 0.55. It is probably a little lower because the individual-level analysis does not account for the fact that consumers in the same web at the same trophic level overlap in which resources they consume.
+
+```{r}
+modx <- glmer(cum_res ~ TL_cat2 + (TL_cat2|foodweb.name) + (1|web_study), 
+              data = filter(hd_grouped),
+              family = 'poisson')
+summary(modx)
+```
+
+Assuming this species accumulation approach is reasonable, there is no need to aggregate by broad trophic level categories. Instead, every consumer in a web can be ranked, and then the cumulative sum of species can be calculated. This represents the accumulation of potential hosts as parasites move up the food web.
+
+```{r}
+ds <- ungroup(brose19TL)%>%
+  arrange(foodweb.name, sw_TL)%>%
+  mutate(unresolved = if_else(con.taxonomy.level != "species" | is.na(con.taxonomy.level), TRUE, FALSE))%>%
+  group_by(foodweb.name, web_study, sw_TL)%>%
+  summarize(n = n(), unresolved_n = sum(unresolved))%>%
+  mutate(resolved_n = n - unresolved_n,
+         cum_sp = cumsum(n), cum_unresolved = cumsum(unresolved_n))
+ds <- left_join(ds, select(ungroup(brose19TL), foodweb.name, study)%>%distinct())
+
+ds <- mutate(ds, tot_unresolved = max(cum_unresolved))%>%
+  mutate(prop_unresolved = unresolved_n/tot_unresolved)%>%
+  mutate(prop_resolved = 1-prop_unresolved)
+```
+```{r}
+ggplot(ds, aes(x = sw_TL, y = cum_sp)) +
+  geom_line(aes(group = foodweb.name, color = study), alpha = 0.3) +
+  # geom_abline(slope = 0.78, intercept = exp(1.75), color = "red", size = 2) +
+  scale_y_log10() +
+  facet_wrap(~study) +
+  labs(x = "Short-weighted TL", y = "Cumulative number of species")
+```
+
+A concern is that taxonomic resolution may vary across webs. I calculated the proportion of consumers at a given trophic level that are not resolved to species level, and then I re-plotted the species accumulation curve but with points scaled by their resolution. This shows that lower trophic level consumers are less likely to be resolved to the species level.
+
+```{r}
+ggplot(filter(ds, web_study %in% most_relevant_studies),
+       aes(x = sw_TL, y = cum_sp)) +
+  geom_line(aes(group = foodweb.name), alpha = 0.25) +
+  geom_point(aes(size = prop_unresolved), alpha = 0.2) +
+  scale_y_log10() +
+  labs(size = "Proportion unresolved", x = "Short-weighted TL", y = "Cumulative number of species")
+```
+```{r}
+# x <- ggplot(filter(ds, web_study %in% most_relevant_studies),
+#        aes(x = sw_TL, y = cum_sp)) +
+#   geom_line(aes(group = foodweb.name), alpha = 0.5) +
+#   geom_line(aes(group = foodweb.name, y = cum_unresolved, x = sw_TL), alpha = 0.5, linetype = 'dashed') +
+#   scale_y_log10() +
+#   facet_wrap(~web_study, scales = 'free_y') +
+#   labs(x = "Average trophic level", y = "Cumulative number of consumers\ndashed = number not resolved to species")
+# x
+```
+```{r}
+# ggsave(x, filename = "checking_taxres_by_tl.png", device = 'png')
+```
+
+Let's try some mixed models to quantify the rate of species accumulation with trophic level. As a fixed effect, I use short-weighted trophic level (average trophic level yields similar results). I treat food web and study as random effects. The model family is `Poisson` as we are dealing with counts. To account for variation in resolution, I weighted data points by the number of consumers at a given trophic level resolved to species. We can start by comparing a model without and with weights.
+```{r}
+ds <- mutate(ds, sw_TLcen = sw_TL-2)
+```
+
+
+```{r}
+mod1 <- glmer(cum_sp ~ sw_TLcen + (1|foodweb.name) + (sw_TLcen|web_study), 
+              data = filter(ds, web_study %in% webs_with_verts, !is.na(sw_TL)),
+              family = 'poisson')
+mod2 <- glmer(cum_sp ~ sw_TLcen + (1|foodweb.name) + (sw_TLcen|web_study), 
+              data = filter(ds, web_study %in% webs_with_verts, !is.na(sw_TL)),
+              weights = log(n*prop_resolved+1),
+              family = 'poisson')
+summary(mod1)
+summary(mod2)
+```
+The models are very similar, so I am somewhat ambivalent about whether to weigh data points or not. It is probably *a priori* the correct thing to do, though. The estimated slope suggests that an increase of one trophic level results in a 76% increase in the total number of consumers. 
+
+```{r}
+0.76 + 1.96*0.07898
+0.76 - 1.96*0.07898
+```
+
+```{r}
+exp(3.35+0.76*0)
+exp(3.35+0.76*1)
+exp(3.35+0.76*2)
+```
+
+Here are the model predictions, broken down by study. They look ok, though there are some webs where a log-linear relationship might not be the best fit.
+
+```{r}
+tx <- mod2@frame
+tx$preds <- predict(mod1)
+tx$preds2 <- predict(mod2)
+```
+```{r}
+ggplot(tx, aes(x = sw_TL, y = cum_sp)) +
+  geom_point(alpha = 0.1) +
+  # geom_point(aes(size = `(weights)`), alpha = 0.1) +
+  geom_line(aes(group = foodweb.name, x = sw_TL, y = exp(preds2)), alpha = 0.5, color = 'red') +
+  # geom_line(aes(group = foodweb.name, x = sw_TL, y = exp(preds2)), alpha = 0.5, color = 'blue') +
+  facet_wrap(~web_study, ncol = 4, scales = 'free_y') +
+  labs(size = "Weights", x = "Short-weighted TL", y = "Cumulative number of species") 
+# scale_y_log10()
+```
+```{r}
+filter(tx, sw_TL %in% c(2,3))%>%
+  mutate(pred_r = exp(preds2))%>%
+  select(sw_TL, cum_sp, pred_r)
+```
+
+Let's modify the model so that the rate of species accumulation can be non-linear. For both the overall relationship (fixed effect) and the study-specific relationship (random slope), we add a polynomial term.
+
+```{r}
+mod3 <- glmer(cum_sp ~ poly(sw_TL,2) + (1|foodweb.name) + (poly(sw_TL,2)|web_study), 
+              data = filter(ds, web_study %in% webs_with_verts, !is.na(sw_TL)),
+              weights = log(n*prop_resolved+1),
+              family = 'poisson')
+```
+
+The addition of this non-linearity improves the model, as judged by a likelihood ratio test. 
+
+```{r}
+anova(mod2, mod3)
+```
+
+And the parameters are consistent with expectations: a positive first-order effect and a negative second-order effect, indicating the number of consumers increases with trophic level but with diminishing returns.
+
+```{r}
+summary(mod3)
+```
+
+Let's visualize the model output. The red lines are the predictions from the previous, linear model, while the blue lines are the predictions fom the non-linear model. The non-linear model fits several webs better.
+
+```{r}
+tx$preds3 <- predict(mod3)
+```
+```{r}
+if(exists("newdat")) {rm(newdat)}
+for(ws in unique(tx$web_study)){
+  dx <- filter(tx, web_study == ws) 
+  for(fw in unique(dx$foodweb.name)){
+    dxx <- filter(dx, foodweb.name == fw)
+    tl <- seq(from = min(dxx$sw_TL), to = max(dxx$sw_TL), by = 0.05)
+    newd <- data.frame(sw_TL = tl, foodweb.name = fw, web_study = ws)
+    
+    if(!exists("newdat")){
+      newdat <- newd
+    } else {
+      newdat <- bind_rows(newdat, newd)
+    }
+  }
+}
+rm(ws, dx, dxx, tl, newd)
+```
+```{r}
+newdat$preds <- predict(mod3, newdata = newdat)
+```
+```{r}
+x <- ggplot(filter(tx, web_study != "Mendonca et al. (2018)"), aes(x = sw_TL, y = cum_sp)) +
+  geom_point(alpha = 0.1) +
+  # geom_point(aes(size = `(weights)`), alpha = 0.1) +
+  geom_line(aes(group = foodweb.name, x = sw_TL, y = exp(preds2)), alpha = 0.5, color = 'red') +
+  geom_line(data = filter(newdat, web_study != "Mendonca et al. (2018)"),
+            aes(group = foodweb.name, x = sw_TL, y = exp(preds)), alpha = 0.5, color = 'blue') +
+  facet_wrap(~web_study, ncol = 4, scales = 'free_y') +
+  # scale_y_log10() +
+  labs(size = "Weights", x = "Short-weighted TL", y = "Cumulative number of species") 
+x
+```
+```{r}
+most_relevant_studies2 <- c("Cohen et al. (2009)", "Ekloef et al. (2013)", 
+                        "Jacob et al. (2011)", "Jacob et al. (2015)", "Lafferty et al. (2006)", 
+                        "Mouritsen et al. (2011)", "Thieltges et al. (2011)", "Preston et al. (2012)", "Hechinger et al. (2011)") #"Zander et al. (2011)"
+
+x <- ggplot(filter(tx, web_study %in% most_relevant_studies2),
+            aes(x = sw_TL, y = cum_sp)) +
+  geom_point(alpha = 0.1) +
+  # geom_point(aes(size = `(weights)`), alpha = 0.1) +
+  geom_line(aes(group = foodweb.name, x = sw_TL, y = exp(preds2)), alpha = 0.5, color = 'red') +
+  geom_line(data = filter(newdat, web_study %in% most_relevant_studies2),
+            aes(group = foodweb.name, x = sw_TL, y = exp(preds)), alpha = 0.5, color = 'blue') +
+  facet_wrap(~web_study, ncol = 3, scales = 'free_y') +
+  labs(size = "Weights", x = "Short-weighted TL", y = "Cumulative number of species") +
+  scale_y_log10()
+x
+ggsave(x, filename = "species_accumulation_mixed_mod_preds.png", device = 'png', width = 6, height = 4)
+```
+
+
+# Conclusions, number of species
+
+I confirmed two opposing food web trends with relevance to parasite trophic transmission: the number of consumers (potential next hosts) decreases at higher trophic levels and the number of routes (intermediate hosts) to a consumer increases with trophic level. The latter trend is stronger than the former, resulting in an overall increase in 'potential host range' as parasite life cycles are expanded to include more trophic transmission steps. This relationship is helpful for structuring expectations for the relationship between parasite generalism and life cycle length. I imagine the following hypotheses:
+
+1. Generalism vs life cycle length, slope = **0**.
+  + Generalism is strongly constrained, such that adding hosts/life stages does not result in an overall increase in host range
+2. Generalism vs life cycle length, slope = **1**.
+  + Generalism is unconstrained, such that each additional stage adds an equal number of hosts to the total host range
+3. Generalism vs life cycle length, slope = **0.6** and **0.8**.
+  + Generalism is driven by food web opportunity, with each step in the life cycle increasing the parasite's potential host range by ~60-80%. The rate of increase is determined by the accumulation of consumers by trophic level in empirical food webs.
+4. Generalism vs life cycle length, slope less than **0.6**.
+  + Generalism increases with stage number, but less than expected in terms of opportunity, thereby hinting at costs of generalism.
+
+# Taxonomic diversity
+
+Another consideration: how does *taxonomic* diversity change with trophic level? Phylogeny determines position in food webs, so we would expect species at the same trophic level to be more taxonomically similar than species at different trophic levels. This would imply that as parasite extend their life cycle, they encounter more kinds of hosts.
+
+```{r}
+# load host taxonomy
+host.tax <- read.csv(file = "../../../Mapping_LCL/host_similarity_clustering/data/ncbi_host_taxonomy_body_size_dat.csv")
+```
+```{r}
+# some host taxonomy was missing for ~180 spp in LCDB, so I manually filled it
+not_ncbi_tax <- read.csv(file = "../../../Mapping_LCL/host_similarity_clustering/data/host_tax_manually_filled.csv", header = TRUE)
+# also re-ran taxonomy script for FW data
+host.tax.fw <- read.csv(file = "../../data/ncbi_host_taxonomy_FW.csv", header = T)
+# make a single host tax ds
+host.tax2 <- select(host.tax, sp.query, genus, family, order, class, phylum)
+host.tax2 <- bind_rows(host.tax2, select(not_ncbi_tax, sp.query = binomial, genus, family, order, class, phylum))%>%distinct()
+host.tax2 <- bind_rows(host.tax2, select(host.tax.fw, sp.query, genus, family, order, class, phylum))%>%distinct()
+# make host genus lowercase, better matching?
+host.tax2 <- mutate(host.tax2, g2 = tolower(genus))
+```
+
+I added taxonomy to the food web data.
+```{r}
+brose19TL <- mutate(brose19TL, genus = substr(con.taxonomy, start = 1, stop = regexpr(" ", con.taxonomy) - 1))%>%
+  mutate(genus = if_else(con.taxonomy.level == "genus" & genus == "", con.taxonomy, genus))%>%
+  mutate(g2 = tolower(genus))
+```
+
+```{r}
+otago_nodes <- read.csv("../../data/webs/Otago_Data_Nodes.csv")
+otago_nodes <- select(otago_nodes, WorkingName, genus = Genus, species = SpecificEpithet)%>%distinct()
+sylt_nodes <- read.csv("../../data/webs/ECOL_92_172/Sylt_Data_Nodes.csv")
+sylt_nodes <- select(sylt_nodes, WorkingName, genus = Genus, species = SpecificEpithet)%>%distinct()
+flens_nodes <- read.csv("../../data/webs/ECOL_92_174/Flensburg_Data_Nodes.csv")
+flens_nodes <- select(flens_nodes, WorkingName, genus = Genus, species = Specific.epithet)%>%distinct()
+qp_nodes <- read.csv("../../data/webs/ECOL_93_153/Data/Quick_Pond_Nodes.csv")
+qp_nodes <- select(qp_nodes, WorkingName, genus = Genus, species = SpecificEpithet)%>%distinct()
+bsq_nodes <- read.csv("../../data/webs/ECOL_92_66/BSQ_nodes.csv")
+bsq_nodes <- select(bsq_nodes, WorkingName, genus = Genus, species = SpecificEpithet)%>%distinct()
+epb_nodes <- read.csv("../../data/webs/ECOL_92_66/EPB_nodes.csv")
+epb_nodes <- select(epb_nodes, WorkingName, genus = Genus, species = SpecificEpithet)%>%distinct()
+otago_nodes$foodweb.name <- "Otago"
+sylt_nodes$foodweb.name <- "Sylt"
+flens_nodes$foodweb.name <- "Flensburg"
+qp_nodes$foodweb.name <- "Quick Pond"
+bsq_nodes$foodweb.name <- "Bahía San Quintín"
+epb_nodes$foodweb.name <- "Estero de Punta Banda"
+
+
+ps_fw_spp <- bind_rows(otago_nodes, sylt_nodes, flens_nodes, qp_nodes, bsq_nodes, epb_nodes)
+
+ps_fw_spp <- ps_fw_spp%>%distinct()%>%
+  filter(genus != "")%>%
+  mutate(con.taxonomy = paste(genus, species), g2 = tolower(genus))
+
+ps_fw_spp$con.taxonomy.level <- "genus" # all are at least specified to genus
+rm(otago_nodes, sylt_nodes, flens_nodes, qp_nodes, bsq_nodes, epb_nodes)
+```
+
+```{r}
+mv <- match( paste(brose19TL$con.taxonomy, brose19TL$foodweb.name), 
+             paste(ps_fw_spp$WorkingName, ps_fw_spp$foodweb.name))
+
+brose19TL$g2[!is.na(mv)] <- ps_fw_spp$g2[na.omit(mv)]
+```
+
+
+```{r}
+fw_tax <- left_join( filter(brose19TL, g2!= "", !is.na(g2)),
+                    select(host.tax2, g2, family, order, class, phylum)%>%distinct()%>%na.omit(),
+                    by = 'g2')
+```
+
+There is still a lot of missing taxonomic data, as indicated in the prop table below. 
+
+```{r}
+sapply(fw_tax, function(x){round(sum(is.na(x))/length(x), 2)})
+```
+
+Partly this is due to aggregation of taxa at some nodes. Here are some examples:
+
+```{r}
+filter(fw_tax, is.na(family))%>%select(con.taxonomy, con.taxonomy.level, g2, foodweb.name)%>%distinct()%>%
+  filter(foodweb.name == "Sylt")
+```
+
+First, let's take the same approach as above. We'll rank consumers by their trophic level. Then, we loop through them, and after each addition, calculate the taxonomic dissimilarity index.
+
+```{r, message=FALSE, warning=FALSE}
+source("../calculate_specificity_index/host_specificity_index_calculation_functions.R")
+```
+```{r}
+fw_tax_hsi <- ungroup(fw_tax)%>%
+  arrange(foodweb.name, sw_TL)%>%
+  filter(!is.na(genus) , !is.na(family) , !is.na(order) , !is.na(class) , !is.na(phylum))%>%
+  filter(!is.nan(sw_TL))%>%
+  select(con.taxonomy, genus, family, order, class, phylum, foodweb.name, sw_TL)
+fw_tax_hsi_agg <- group_by(fw_tax_hsi, foodweb.name, sw_TL)%>%
+  summarize(n = n())
+```
+```{r}
+fw_tax_hsi_agg$hsi <- NA # numeric to collect calculated host specificity index
+fw_tax_hsi_agg$var.hsi <- NA # numeric to collect calculated variation in host specificity index
+fws <- unique(fw_tax_hsi_agg$foodweb.name)
+
+# loop across food webs
+for(fw in fws){
+  dx <- filter(fw_tax_hsi, foodweb.name == fw)
+  uniq_tl <- unique(dx$sw_TL)
+  
+  # loop across unique trophic levels
+  for(tl in uniq_tl){
+    dxx <- filter(dx, sw_TL <= tl) # take all consumers less than or equal to TL
+    hs.out <- with(dxx, hs.index(con.taxonomy, genus, family, order, class, phylum)) # calc host spec index
+    
+    rowx <- which(fw_tax_hsi_agg$foodweb.name == fw & fw_tax_hsi_agg$sw_TL == tl)
+    # add output to data frame aggregated by trophic level
+    fw_tax_hsi_agg$hsi[rowx] <- hs.out[1]
+    fw_tax_hsi_agg$var.hsi[rowx] <- hs.out[2]
+    
+  }
+  
+}
+rm(fw, dx, uniq_tl, tl, dxx, hs.out, rowx)
+```
+
+```{r}
+fw_tax_hsi_agg <- left_join(fw_tax_hsi_agg, select(ungroup(brose19TL), foodweb.name, web_study)%>%distinct())
+```
+
+When we plot how tax dissimilarity 'accumulates' with trophic level, we see that in most webs, it is very steady. This indicates that adding hosts, one at a time, does not change the index much. This metric of generalism does not accumulate like species counts.
+
+```{r}
+ggplot(fw_tax_hsi_agg, aes(x = sw_TL, y = hsi)) +
+  geom_point(alpha = 0.1) +
+  geom_line(aes(group = foodweb.name)) +
+  facet_wrap(~web_study, ncol = 4) +
+  labs(x = "Short-weighted TL", y = "Tax dissim index") 
+```
+
+Thus, we have to take a different approach. Let's look at pairs of consumers across food webs. If two species in a pair have similar trophic levels, then we expect them to be more closely related than species pairs occupying different trophic levels. For every web, I made every possible species pair and then calculated their taxonomic relatedness (different genera, families, etc.).
+
+```{r}
+fw_count <- 1
+# loop across food webs
+for(fw in fws){
+  # make all pairwise combos of consumers in web
+  dx <- filter(fw_tax_hsi, foodweb.name == fw)
+  tx <- t(combn(dx$con.taxonomy, 2))
+  tx <- as.data.frame(tx)
+  names(tx) <- c("C1", "C2")
+  tx$foodweb.name <- fw 
+  tx <- left_join(tx, select(dx, con.taxonomy, TL1 = sw_TL), by = c("C1" = "con.taxonomy"))
+  tx <- left_join(tx, select(dx, con.taxonomy, TL2 = sw_TL), by = c("C2" = "con.taxonomy"))
+  
+  # loop through consumer pairs, calculate tax dissim
+  tx$hsi <- NA
+  for(i in seq_along(tx$C1)){
+    c1 <- tx$C1[i]
+    c2 <- tx$C2[i]
+    dxx <- filter(dx, con.taxonomy == c1 | con.taxonomy == c2)
+    # IF DIM dxx > 2, TOOK MORE THAN TWO SPECIES!
+    # if(dim(dxx)[1] > 2) {break}
+    hs.out <- with(dxx, hs.index(con.taxonomy, genus, family, order, class, phylum)) # calc host spec index
+    tx$hsi[i] <- hs.out[1]
+  }
+  
+  # combine into out df
+  if(fw_count == 1){
+    hsi_all_out <- tx
+  } else {
+    hsi_all_out <- bind_rows(hsi_all_out, tx)
+  }
+  
+  fw_count <- fw_count+1
+  
+}
+
+# rm(fw, dx, dxx, tl1, tl2, highertl, lowertl, tl_diff, hs.out, dout)
+```
+
+
+```{r}
+hsi_all_out <- left_join(hsi_all_out, select(ungroup(brose19TL), foodweb.name, web_study)%>%distinct())
+hsi_all_out <- mutate(hsi_all_out, tl_diff = TL2 - TL1)
+```
+
+As a first plot, we can see that species pairs that differ more in TL also differ more taxonomically. There is a lot of variation among webs though.
+
+```{r}
+ggplot(hsi_all_out, aes(x = TL2 - TL1, y = hsi)) +
+  geom_point(alpha = 0.01) +
+  geom_smooth(aes(group = foodweb.name), method = 'lm', se = F) +
+  facet_wrap(~web_study, ncol = 4) +
+  labs(x = "Diff in trophic levels", y = "Tax dissim index") 
+```
+
+So TL difference matters, but what about the absolute TL value. Let's now plot taxonomic dissimilarity as a function of the trophic level of consumer with the lower TL. It often decreases, suggesting more taxonomic variation among lower-level consumers than higher-level consumers.
+
+```{r}
+ggplot(hsi_all_out, aes(x = TL1, y = hsi)) +
+  geom_point(alpha = 0.01) +
+  geom_smooth(method = 'lm', se = F) +
+  facet_wrap(~web_study, ncol = 4) +
+  labs(x = "Short-weighted TL - Lower level consumer", y = "Tax dissim index") 
+```
+```{r}
+# ggplot(hsi_all_out, aes(x = TL2, y = hsi)) +
+#   geom_point(alpha = 0.01) +
+#   geom_smooth( method = 'lm', se = F) +
+#   facet_wrap(~web_study, ncol = 4) +
+#   labs(x = "Short-weighted TL - Higher level consumer", y = "Tax dissim index") 
+```
+
+These plots suggest that for a species pair, their taxonomic similarity depends on their absolute and relative trophic levels. Let's fit mixed models again. For a species pair, we test the effect of both consumer's trophic level, their interaction, and the variance across webs.
+
+```{r}
+hsi_all_out <- mutate(hsi_all_out, hsi_s = hsi - 1, hsi_f = 6-hsi,
+                      TL1cen = TL1 - 2, TL2cen = TL2 - 2)
+```
+
+```{r}
+mod0 <- lmer(hsi ~ 1 + (1|foodweb.name) + (1|web_study), 
+             data = hsi_all_out)
+mod1 <- update(mod0, .~. + TL1cen + TL2cen)
+mod2 <- update(mod1, .~. + TL1cen:TL2cen) # add interaction
+mod3 <- update(mod2, .~. + (0+TL1cen|web_study) + (0+TL2cen|web_study)) # add random slopes
+```
+```{r}
+anova(mod0, mod1, mod2, mod3)
+summary(mod3)
+# plot(mod3)
+```
+
+It varies strongly across webs. But overall, there was a tendency for tax dissim to decrease with trophic level (low-level consumers are more dissimilar than high-level consumers) and to increase with trophic differences.
+
+```{r}
+fw_med_tl <- fw_tax_hsi%>%group_by(foodweb.name)%>%
+  summarize(med_web_tl = median(sw_TL), 
+            web_top_quartile = quantile(sw_TL, 0.75),
+            web_bot_quartile = quantile(sw_TL, 0.25))
+hsi_all_out <- left_join(hsi_all_out, fw_med_tl) # add median tl for web to df
+
+hsi_all_out <- mutate(hsi_all_out, tl_cat = if_else(TL1 <= med_web_tl & TL2 <= med_web_tl, "low-low",
+                                                    if_else(TL1 > med_web_tl & TL2 > med_web_tl, "high-high", "low-high"))) # TL above or below web's median TL?
+hsi_all_out <- mutate(hsi_all_out, tl_cat2 = if_else(TL1 <= web_bot_quartile & TL2 <= web_bot_quartile, "low-low",
+                                                    if_else(TL1 >= web_top_quartile & TL2 >= web_top_quartile, "high-high", "low-high"))) # TL above or below web's median TL?
+```
+
+I tried many ways of visualizing these model results, and eventually settled on heatmaps.
+
+```{r}
+# # SHOW FIXED EFFECT SLOPES
+# ggplot(hsi_all_out, aes(x = TL1, y = hsi)) +
+#   geom_point(alpha = 0.01) +
+#   geom_smooth(method = 'lm', se = F) +
+#   geom_point(aes(x = TL2, y = hsi), alpha = 0.01, color = 'red') +
+#   geom_smooth(aes(x = TL2, y = hsi), method = 'lm', se = F, color = 'red') +
+#   facet_wrap(~web_study, ncol = 4) +
+#   labs(x = "Trophic level", y = "Tax dissim index") 
+```
+```{r}
+# # HEAT MAP - not great
+# hsi_contour <- hsi_all_out%>%
+#   mutate(tl1c = cut(TL1, 15), tl2c = cut(TL2, 15))%>%
+#   group_by(web_study, tl1c, tl2c)%>%
+#   summarize(hsi = mean(hsi))
+# 
+# 
+# ggplot(hsi_contour, aes(x = tl1c, y = tl2c, fill = hsi)) +
+#   geom_raster() +
+#   facet_wrap(~web_study, ncol = 4) +
+#   scale_fill_distiller(type = 'seq', palette = "YlOrRd", direction = -1) +
+#   theme(axis.text = element_blank(),
+#         panel.grid = element_blank())
+```
+```{r}
+# x <- ggplot(filter(hsi_all_out, tl_cat2 != "low-high", web_study %in% most_relevant_studies), 
+#        aes(y = hsi, x = tl_cat2)) +
+#   geom_boxplot(outlier.colour = NA) +
+#   geom_point(position = position_jitter(), alpha = 0.01) +
+#   facet_wrap(~web_study, ncol = 4) +
+#   labs(y = "Taxonomic dissimilarity") +
+#   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+#   theme(axis.title.x = element_blank())
+# x
+# ggsave(x, filename = "tax_dissim_TL2.png")
+```
+
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+
+hsi_all_out <- mutate(hsi_all_out, C1f = factor(paste(C1, foodweb.name), levels = unique(paste(C1, foodweb.name))),
+                       C2f = factor(paste(C2, foodweb.name), levels = unique(paste(C2, foodweb.name))))
+
+hsi_all_out <- group_by(hsi_all_out, foodweb.name)%>%
+  mutate(sp_rich = n_distinct(c(C1, C2)))%>%
+  ungroup()
+```
+```{r}
+x <- ggplot(filter(hsi_all_out, web_study %in% most_relevant_studies2 & foodweb.name != "Bahía San Quintín"), 
+       aes(y = C2f, x = C1f)) +
+  geom_point(aes(color = as.factor(hsi), size = 1/sp_rich), shape = 15) +
+  scale_size(range = c(0.01, 1)) +
+  scale_color_brewer(type = 'seq', palette = "Reds", direction = -1, labels = c("species", tax.ranks)) +
+  facet_wrap(~web_study, ncol = 3, scales = 'free') +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank()) +
+  guides(size = FALSE, color = guide_legend(override.aes = list(size = 2.5))) +
+  labs(x = "Trophic rank consumer 1", y = "Trophic rank consumer 2", color = "Taxonomic\ndissimilarity")
+x
+ggsave(x, filename = "tax_dissim_TL.png", width = 6, height = 4)
+```
+
+To get a feel for how taxonomic dissimilarity varies with trophic levels, we can examine a few predictions from the mixed model. What it the predicted taxonomic dissimilarity of two primary consumers? Different classes on average
+
+```{r}
+tx <- mod3@frame
+tx$preds <- predict(mod3)
+```
+```{r}
+filter(tx, TL1cen == 0, TL2cen == 0)%>%
+  summarize(mean = mean(preds))
+```
+
+What about between two secondary consumers? It is lower, between order and class.
+
+```{r}
+filter(tx, TL1cen == 1, TL2cen == 1)%>%
+  summarize(mean = mean(preds))
+```
+
+What about between two tertiary consumers? It is lower still.
+
+```{r}
+filter(tx, TL1cen == 2, TL2cen == 2)%>%
+  summarize(mean = mean(preds))
+```
+
+And what about across trophic levels, say between an herbivore and omnivore? They are from different phyla or orders.
+
+```{r}
+filter(tx, TL1cen == 0, TL2cen == 0.5)%>%
+  summarize(mean = mean(preds))
+```
+
+Between a primary and secondary consumer?
+
+```{r}
+filter(tx, TL1cen == 0, TL2cen == 1)%>%
+  summarize(mean = mean(preds))
+```
+
+Between a primary and tertiary consumer?
+
+```{r}
+filter(tx, TL1cen == 0, TL2cen == 2)%>%
+  summarize(mean = mean(preds))
+```
+
+
+
+Let's try adding these predictions to the heatmap figure as below diagonal elements. Here are just the model predictions below the diagonal. They confirm the patterns seen in the empirical data, an increase in dissimilarity with trophic level divergence, and more similarity among top predators than lower-level consumers.
+
+```{r}
+hsi_heatmap <- select(hsi_all_out, web_study, C2f, C1f, hsi)
+hsi_heatmap$preds <- tx$preds
+```
+```{r}
+x <- ggplot(filter(hsi_heatmap, web_study %in% c("Cohen et al. (2009)", "Ekloef et al. (2013)", "Jacob et al. (2011)", 
+                                            "Jacob et al. (2015)", "Kroll, unpublished ", "Lafferty et al. (2006)")), 
+       aes(y = C2f, x = C1f)) +
+  # geom_point(aes(color = hsi), size = 0.1) +
+  scale_color_distiller(type = 'seq', palette = "Reds", direction = -1, breaks = 1:6, labels = c("species", tax.ranks)) +
+  geom_point(aes(x = C2f, y = C1f, color = preds), size = 0.1) +
+  facet_wrap(~web_study, ncol = 3, scales = 'free') +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank()) +
+  labs(x = "Trophic rank consumer 1", y = "Trophic rank consumer 2", color = "Taxonomic dissimilarity")
+x
+```
+
+However, plotting the empirical data and model predictions together turns into a mess. The reason is that the predictions are less variable than the observed data, such that the color scales for empirical vs predicted dissimilarity do not play well together.
+
+```{r}
+x <- ggplot(filter(hsi_heatmap, web_study %in% c("Cohen et al. (2009)", "Ekloef et al. (2013)", "Jacob et al. (2011)", 
+                                            "Jacob et al. (2015)", "Kroll, unpublished ", "Lafferty et al. (2006)")), 
+       aes(y = C2f, x = C1f)) +
+  geom_point(aes(color = hsi), size = 0.1) +
+  scale_color_distiller(type = 'seq', palette = "Reds", direction = -1, breaks = 1:6, labels = c("species", tax.ranks)) +
+  geom_point(aes(x = C2f, y = C1f, color = preds), size = 0.1) +
+  facet_wrap(~web_study, ncol = 3, scales = 'free') +
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.grid = element_blank()) +
+  labs(x = "Trophic rank consumer 1", y = "Trophic rank consumer 2", color = "Taxonomic dissimilarity")
+x
+```
+
+It is challenging to apply multiple color scales to a single plot, so I won't mess around with producing a plot with above and below diagonal elements.
+
+# Conclusions, taxonomic diversity
+
+This analysis confirmed that:
+
+1. Species with different trophic levels are less likely to be related than species with similar trophic levels.
+2. Taxonomic diversity is often higher at the base than at the top of food webs.
+
+These conclusions lead to similar predictions as for species counts. Parasite generalism is expected to increase as parasites are transmitted across multiple trophic levels and it may be expected to be highest at the initial host stages.
+
+```{r}
+# #We'll use the same trophic level categories that we have used thus far, and for each trophic level category, we'll calculate the number of consumers in the trophic level and the number of resources leading to a consumer at that level. In the context of trophically-transmitted parasites, we can think of this as the number of potential definitive hosts and the potential intermediate hosts leading to those definitive hosts.
+
+
+# chains_TL_group <- left_join(chains, 
+#                              select(brose19TL, target_consumer = con.taxonomy, fw = foodweb.name, avg_TLcat2))
+# 
+# chains_TL_group <- chains_TL_group%>%
+#   group_by(fw, avg_TLcat2)%>% # for given web and TL category
+#   summarize(pot_hosts_lower = n_distinct(res))
+# 
+# chains_TL_group <- left_join(chains_TL_group, rename(hd_grouped, fw = foodweb.name, pot_hosts_atTL = n))
+```
+```{r}
+# chains_TL_group_long <- chains_TL_group%>%
+#   gather("trt", "n", 3:4)
+```
+
+```{r}
+# ggplot(filter(chains_TL_group_long, !is.na(avg_TLcat2)),
+#        aes(x = avg_TLcat2, y = n, fill = trt)) +
+#   geom_boxplot(position = position_dodge()) +
+#   scale_y_log10() +
+#   facet_wrap(~study)
+```
+
+```{r}
+# chains_TL_group <- mutate(chains_TL_group, TL_cat2 = as.integer(avg_TLcat2))%>%
+#   mutate(TL_cat2 = if_else(TL_cat2 == 1, 0, # TL of 2 set to zero, so model intercept is at TL = 2
+#                            if_else(TL_cat2 == 2, 1, 2)))%>%
+#   mutate(study = if_else(grepl("AEW", fw) | grepl("HEW", fw) | grepl("SEW", fw),
+#                          "Digel et al. 2014", "other"))
+```
+
+```{r}
+# ggplot(filter(chains_TL_group, !is.na(avg_TLcat2)),
+#        aes(y = pot_hosts_atTL, x = avg_TLcat2)) +
+#   geom_line(aes(group = fw, color = study)) +
+#   scale_y_log10()
+```

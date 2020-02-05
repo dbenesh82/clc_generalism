@@ -1,0 +1,911 @@
+---
+title: "Quantifying potential host range from food webs"
+author: "Dan Benesh"
+date: "05/02/2020"
+output: github_document
+---
+
+In this notebook, I quantify how parasites with longer life cycles may accumulate hosts. To do this, I used a compilation of food webs and simulated parasite life cycles in them. The simulation steps are in this [notebook](simulate_parasites_in_webs.Rmd).
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r}
+load("dat_after_chains.RData")
+```
+
+```{r}
+# for cases where just one first host and host lacks taxonomy, can assign an HSI of 1
+chains3_l <- mutate(chains3_l, hsi = if_else(cum_hosts == 1 & step_int == 1 & is.na(hsi), 1, hsi),
+                    cum_hsi = if_else(cum_hosts == 1 & step_int == 1 & is.na(cum_hsi), 1, cum_hsi))
+```
+
+Here is the number of generated, hypothetical life cycles:
+
+```{r}
+n_distinct(filter(chains3_l, hosts != 0, web_study %in% webs_with_verts)$index)
+```
+
+They were generated from this many food webs:
+
+```{r}
+n_distinct(filter(chains3_l, hosts != 0, web_study %in% webs_with_verts)$fw)
+```
+
+
+## Stage-level generalism
+
+### Host range
+After giving parasites random starting points (first hosts), how many hosts will they encounter with each transmission event? In the plot below, we can see how the number of *potential* hosts changes with each transmission event. Each line is a hypothetical parasite. The parasites are able to infect either many or few first hosts, which allows us to visualize the two opposing forces acting on host range. If parasites infect many first hosts (red lines), there are relatively fewer 'next' hosts available, such that the number of new, potential hosts encountered decreases with multiple transmission events. By constrast, if parasites infect few first hosts (blue lines), then the number of 'next hosts' can increase, at least initially. After one or two transmission events the trophic pyramid constraint seems to take over. The panels of the plot are webs that are known to include helminths.
+
+```{r}
+most_relevant_studies2 <- c("Cohen et al. (2009)", "Ekloef et al. (2013)", 
+                        "Jacob et al. (2011)", "Jacob et al. (2015)", "Zander et al. (2011)", 
+                        "Mouritsen et al. (2011)", "Thieltges et al. (2011)", "Preston et al. (2012)", "Hechinger et al. (2011)") #"Zander et al. (2011)"
+
+```
+```{r}
+ggplot(filter(chains3_l, web_study %in% most_relevant_studies2),
+       aes(x = step_int, y = hosts, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.5) +
+  facet_wrap(~web_study, scales = 'free_y') +
+  labs(x = "Sequential predation events (host in cycle)", y = "Potential hosts", 
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  theme(panel.grid.minor = element_blank())
+```
+
+In many cases, the potential hosts falls to zero after multiple transmission events, and we can also make this plot excluding the points when there are no more 'next hosts'. This stops the lines before a 4th host in most cases, which emphasizes why such long life cycles are relatively rare - parasites run out of next hosts, especially if they start with a broad first host range. (Note: this decline is much less precipitous if we allow intraguild predation where a host at stage 1 can also be a host at stage 2 and so on).
+
+```{r}
+figsx <- ggplot(filter(chains3_l, hosts != 0, web_study %in% most_relevant_studies2),
+                aes(x = step_int, y = hosts, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.2) +
+  facet_wrap(~web_study, scales = 'free_y') +
+  labs(x = "Sequential predation events (host in cycle)", y = "Potential hosts", 
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  theme(panel.grid.minor = element_blank(), 
+        legend.title = element_text(size = 8),
+        strip.text = element_text(size = 6))
+figsx
+ggsave(figsx, filename = "../../figs/FigS7.svg", device = 'svg', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS7.png", device = 'png', width = 6, height = 4)
+rm(figsx)
+```
+
+We can make the same plot, but make the y-axis a proportion. That is, how much of the parasite's total host range is at any given stage? This once again nicely shows how the pattern across stages will depend on the number of first hosts infected. If many first hosts are infected, generalism should be subject to the 'pyramid' constraint and decrease. If few first hosts are infected, generalism can increase with stage number, at least initially.
+
+```{r}
+ggplot(filter(chains3_l, hosts != 0, web_study %in% most_relevant_studies2),
+       aes(x = step_int, y = prop_hosts_per_stage, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.5) +
+  facet_wrap(~web_study) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Sequential predation events (host in cycle)", y = "Proportion of encountered hosts", color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
+```
+
+Now, let's try to model this relationship to get quantitative expectations. Potential host range changes non-linearly with transmission events, i.e. host range does not uniformly increase or decrease with more transmission events. Therefore, let's treat predation/transmission steps as a factor and see how its effect changes depending on the number of first hosts. We'll fit a mixed model accounting for study and food web. The plot above suggests that one predation step may have a different impact in different food webs, so I allowed the effect of this factor to vary by study. The model has Poisson errors, as that led to a much better residual plot than normally distributed errors.
+
+```{r}
+library(lme4)
+```
+```{r}
+spp <- unique(chains3_l$index)
+spp <- sample(spp, 5000)
+```
+
+First, here is the likelihood ratio test comparing the model with and without the random slopes term:
+
+```{r}
+t0 <- glmer(hosts ~ steps * prop_pot_first_hosts + (1|index) + (1|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts, index %in% spp), 
+            family = 'poisson',
+            # next two arguments speed up model estimation
+            nAGQ=0,
+            control=glmerControl(optimizer = "nloptwrap"),
+           )
+t1 <- update(t0, . ~ . + (steps+0|web_study) - (1|web_study))
+anova(t0, t1)
+```
+
+```{r}
+t1 <- glmer(hosts ~ steps * prop_pot_first_hosts + (1|index) + (steps+0|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts),
+            family = 'poisson',
+            # next two arguments speed up model estimation
+            nAGQ=0,
+            control=glmerControl(optimizer = "nloptwrap")
+           )
+```
+
+And here are the parameters from the better model:
+
+```{r}
+summary(t1)
+```
+
+We can use this model to overlay expectations on Figure 3, the observed generalism patterns across the life cycle. For different starting conditions (number of first hosts), I calculated the expected host range across life stages for an "average" food web.
+
+```{r}
+hosts_per_stage <- read.csv(file = "../../data/stage_level_combined.csv", header = TRUE)
+```
+```{r}
+hosts_per_stage <- mutate(hosts_per_stage, di_plot = factor(Def.int, levels = c('int', 'def')))%>%
+  mutate(di_plot = factor(di_plot, labels = c("intermediate", "definitive")))
+```
+
+```{r}
+#  calculate percent changes for different proportions of available first hosts infected
+fe <- t1@beta
+
+h1 <- fe[1] # first host
+h2 <- fe[2] # secon host
+h3 <- fe[3] # third host
+h4 <- fe[4] # fourt host
+pp <- fe[5]
+pph2 <- fe[6]
+pph3 <- fe[7]
+pph4 <- fe[8]
+
+
+for(p in seq(0.01, 1, by = 0.005)) {
+  
+  preds <- c(h1 + pp*p,
+             h1 + h2 + pp*p + pph2*p,
+             h1 + h3 + pp*p + pph3*p,
+             h1 + h4 + pp*p + pph4*p)
+  preds <- exp(preds)
+  # perc_change <- c( (preds[2] - preds[1])/preds[1],
+  #                   (preds[3] - preds[2])/preds[2],
+  #                   (preds[4] - preds[3])/preds[3]
+  #                   )
+  d <- as.data.frame(cbind(p, preds, Host.no = c(1,2,3,4)))
+  if(p == 0.01) {
+    d_out <- d
+  } else {
+    d_out <- bind_rows(d_out, d)
+  }
+}
+d_out <- rename(d_out, hosts = preds, perc = p)
+```
+```{r}
+d_out1 <- filter(d_out, Host.no < 2)
+d_out2 <- filter(d_out, Host.no < 3)
+d_out3 <- filter(d_out, Host.no < 4)
+d_out1$lcl_max_fac <- "1"
+d_out2$lcl_max_fac <- "2"
+d_out3$lcl_max_fac <- "3"
+d_out$lcl_max_fac <- "3+"
+d_out <- bind_rows(d_out, d_out1, d_out2, d_out3)
+```
+
+Here is that plot. Worms generally infect fewer host species than we might expect, but the simulated life cycles do reproduce the non-linear pattern observed for long life cycles.
+
+```{r}
+f2u <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5), # post-cyclic hosts removed
+              aes(x = factor(Host.no), y = num_hosts_suspicious_removed, fill = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black', fill = NA) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.3, jitter.height = 0.025), 
+             color = 'white', shape = 21, alpha = 0.2) +
+  geom_line(data = d_out,
+            aes(x = factor(Host.no), y = hosts, group = perc, color = perc, fill = NULL),
+            linetype = 'solid', alpha = 0.5) +
+  geom_point(data = filter(d_out, lcl_max_fac == "1"),
+            aes(x = factor(Host.no), y = hosts, color = perc, fill = NULL),
+            alpha = 0.5) +
+  scale_y_log10(limits = c(0.95,104), breaks = c(1, 5, 10, 25, 50, 100)) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_fill_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Host records", color = "Proportion\nfirst hosts") +
+  theme(
+        # legend.position = c(1,1),
+        # legend.justification = c(1,1),
+        legend.background = element_rect(color = 'black'),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') +
+  guides(fill = FALSE)
+f2u
+ggsave(f2u, filename = "../../figs/FigS9a.png", device = 'png', units = 'in', width = 6, height = 5)
+ggsave(f2u, filename = "../../figs/FigS9a.svg", device = 'svg', units = 'in', width = 6, height = 5)
+```
+
+### Taxonomic dissimilarity
+
+Moving on to the second generalism metric, taxonomic dissimilarity, let's examine how it changes at the stage level across transmission steps. Usually, it starts very high (primary consumers are diverse) before decreasing slightly after one or two transmission steps (high trophic level hosts are slightly more homogenous taxonomically).
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+```{r}
+figsx <- ggplot(filter(chains3_l, hosts !=0, web_study %in% most_relevant_studies2),
+       aes(x = step_int, y = hsi, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.2) +
+  facet_wrap(~web_study) +
+  labs(x = "Sequential predation events (host in cycle)", y = "Taxonomic dissimilarity index", 
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  theme(panel.grid.minor = element_blank(), 
+        legend.title = element_text(size = 8),
+        strip.text = element_text(size = 6))
+figsx
+ggsave(figsx, filename = "../../figs/FigS8.svg", device = 'svg', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS8.png", device = 'png', width = 6, height = 4)
+rm(figsx)
+```
+
+We can fit essentially the same mixed model to this generalism metric, although since it is not a count, we assume normally-distributed errors.
+
+```{r}
+t2 <- lmer(hsi ~ steps * prop_pot_first_hosts + (1|index) + (steps+0|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts)
+            )
+```
+
+Here are the parameters:
+
+```{r}
+summary(t2)
+```
+
+And we again use the model to plot expectations relative to observed data. Expected generalism values are calculated for an 'average' web for all possible starting conditions.
+
+```{r}
+#  calculate percent changes for different proportions of available first hosts infected
+fe <- t2@beta
+
+h1 <- fe[1] # first host
+h2 <- fe[2] # secon host
+h3 <- fe[3] # third host
+h4 <- fe[4] # fourt host
+pp <- fe[5]
+pph2 <- fe[6]
+pph3 <- fe[7]
+pph4 <- fe[8]
+
+
+for(p in seq(0.01, 1, by = 0.005)) {
+  
+  preds <- c(h1 + pp*p,
+             h1 + h2 + pp*p + pph2*p,
+             h1 + h3 + pp*p + pph3*p,
+             h1 + h4 + pp*p + pph4*p)
+  # preds <- exp(preds)
+  # perc_change <- c( (preds[2] - preds[1])/preds[1],
+  #                   (preds[3] - preds[2])/preds[2],
+  #                   (preds[4] - preds[3])/preds[3]
+  #                   )
+  d <- as.data.frame(cbind(p, preds, Host.no = c(1,2,3,4)))
+  if(p == 0.01) {
+    d_out <- d
+  } else {
+    d_out <- bind_rows(d_out, d)
+  }
+}
+d_out <- rename(d_out, hosts = preds, perc = p)
+```
+```{r}
+d_out1 <- filter(d_out, Host.no < 2)
+d_out2 <- filter(d_out, Host.no < 3)
+d_out3 <- filter(d_out, Host.no < 4)
+d_out1$lcl_max_fac <- "1"
+d_out2$lcl_max_fac <- "2"
+d_out3$lcl_max_fac <- "3"
+d_out$lcl_max_fac <- "3+"
+d_out <- bind_rows(d_out, d_out1, d_out2, d_out3)
+```
+
+When we do that, we see that parasites usually use a more restricted range of hosts than expected from feeding relationships. In other words, the available set of hosts (things that might eat the parasite larvae) is usually more diverse than the realized host range. The only exceptions might be paratenic hosts (2nd and 3rd intermediate hosts in long life cycles). A typical parasite stage infects hosts from different genera (same family), but an average infective stage will be ingested by animals from different orders or classes.
+
+```{r}
+f2l <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5), # post-cyclic hosts removed
+              aes(x = factor(Host.no), y = hsi_lcdb_suspcious_rem, fill = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black', fill = NA) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.3, jitter.height = 0.025), 
+             color = 'white', shape = 21, alpha = 0.2) +
+  geom_line(data = d_out,
+            aes(x = factor(Host.no), y = hosts, group = perc, color = perc, fill = NULL),
+            linetype = 'solid', alpha = 0.5) +
+  geom_point(data = filter(d_out, lcl_max_fac == "1"),
+            aes(x = factor(Host.no), y = hosts, color = perc, fill = NULL),
+            alpha = 0.5) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_fill_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Taxonomic dissimilarity", color = "Proportion\nfirst hosts") +
+  theme(
+        # legend.position = c(1,1),
+        # legend.justification = c(1,1),
+        legend.background = element_rect(color = 'black'),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') +
+  guides(fill = FALSE)
+f2l
+ggsave(f2l, filename = "../../figs/FigS9b.svg", device = 'svg', units = 'in', width = 6, height = 5)
+ggsave(f2l, filename = "../../figs/FigS9b.png", device = 'png', units = 'in', width = 6, height = 5)
+```
+
+Then to mirror figure 3, we put the two plots with expectations over observations together and export it.
+
+```{r}
+# combine example web fig b and c
+library(cowplot)
+```
+```{r}
+f2u <- f2u + 
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_blank())
+ap <- align_plots(f2u, f2l, align="hv")
+```
+```{r}
+laff3 <- gridExtra::grid.arrange(ap[[1]], ap[[2]])
+```
+
+```{r}
+ggsave(filename = "../../figs/FigS9.svg", plot = laff3, units = "in", width = 8, height = 8) # bringing the upper plot down still
+```
+```{r}
+rm(f2u, f2l, laff3, ap)
+```
+
+Additionally, in Figure 1, we want to use the Carpinteria Salt Marsh food web as an illustration for how generalism changes with successive transmission steps. To that end, we plot host range and taxonomic dissimilarity for simulated cycles for just this food web, stack them, and export the figure.
+```{r}
+# make figure with one example web, Carpinteria
+laff1 <- ggplot(filter(chains3_l, hosts != 0, web_study == "Lafferty et al. (2006)"),
+       aes(x = step_int, y = hosts, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.6) +
+  labs(x = "Sequential predation events (host in cycle)", y = "Potential hosts", 
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_x_continuous(breaks = c(1:4)) +
+  theme(panel.grid.minor = element_blank()) +
+  guides(color = FALSE) +
+  annotate(geom = 'text', label = "(b)", x = 4, y = 60)
+
+ggsave(plot = laff1, filename = "Example_web_host_range.png", units = 'in', width = 5, height = 4)
+```
+```{r}
+# # this many hypothetical parasites in Carp
+# chains3_l%>%ungroup()%>%
+#   filter(hosts != 0, web_study == "Lafferty et al. (2006)")%>%
+#   select(index)%>%
+#   distinct()%>%
+#   summarize(n=n())
+```
+```{r}
+# make figure with one example web, Carpinteria
+laff2 <- ggplot(filter(chains3_l, hosts !=0, web_study == "Lafferty et al. (2006)"),
+       aes(x = step_int, y = hsi, color = prop_pot_first_hosts)) +
+  geom_line(aes(group = index), alpha = 0.6) +
+  labs(x = "Sequential predation events (host in cycle)", y = "Taxonomic dissimilarity index", 
+       color = "Proportion primary\nconsumers\nas first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_continuous(limits = c(1,4), breaks = c(1:4)) +
+  theme(panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 7),
+        legend.position = c(0.5, 0.02),
+        legend.justification = c(0.5,0),
+        legend.background = element_rect(color = 'black')) +
+  annotate(geom = 'text', label = "(c)", x = 4, y = max(chains3_l$hsi, na.rm = T))
+
+ggsave(plot = laff2, filename = "Example_web_tax_dissim.png", units = 'in', width = 5, height = 4)
+```
+```{r}
+laff1 <- laff1 + 
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_blank())
+ap <- align_plots(laff1, laff2, align="hv")
+```
+```{r}
+laff3 <- gridExtra::grid.arrange(ap[[1]], ap[[2]])
+```
+
+```{r}
+# This is Fig 1b and c!
+ggsave(filename = "../../figs/Fig1bc.svg", plot = laff3, units = "in", width = 5, height = 8) # bringing the upper plot down still
+```
+```{r}
+rm(laff1, laff2, laff3, ap)
+```
+
+
+## Species-level generalism
+
+### Host range
+
+How does stage-level generalism translate to the parasite species level? How should the total *potential* host range change with longer life cycles? I now plot the cumulative number of potential hosts encountered across our hypothetical parasite cycles. The number of hosts levels off earlier if parasites are allowed to infect more first hosts (red lines), as the pyramid constraint works earlier.
+
+```{r}
+figsx <- ggplot(filter(chains3_l, hosts!=0, web_study %in% most_relevant_studies2),
+                aes(x = step_int, y = cum_hosts)) +
+  geom_line(aes(group = index, color = prop_pot_first_hosts), alpha = 0.2) +
+  facet_wrap(~web_study, scales = 'free_y') +
+  theme(panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 8),
+        strip.text = element_text(size = 6)) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  labs(x = "Sequential predation events (host in cycle)", y = "Cumulative encountered hosts", 
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
+figsx
+ggsave(figsx, filename = "../../figs/FigS4.png", device = 'png', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS4.svg", device = 'svg', width = 6, height = 4)
+rm(figsx)
+```
+
+We want to compare how available host range increases in food webs with how realized host range increases with life cycle length in real parasites. As above, we'll fit a mixed model accounting for study and food web. The model has Poisson errors, since we are dealing with counts (the residual plot is much better with Poisson errors). We'll start by fitting predation event as a continuous variable, so the model returns the increase in host number with each predation event.
+
+```{r}
+t3 <- glmer(cum_hosts ~ step_int*prop_pot_first_hosts + (step_int|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts, index %in% spp), 
+            family = 'poisson'
+           )
+summary(t3)
+```
+
+The estimated slope is `r round(t3@beta[2],3)`, which corresponds to a percent change of `r round((exp(t3@beta[2])-1) * 100, 2)`% total hosts per transmission event.
+
+```{r}
+# exp(t3@beta[2])-1
+```
+
+This is weaker than observed in the parasite data, suggesting host range expands quicker than we would expect from food webs. However, the slope is also dependent on how many first hosts are infected. And the increase is non-linear. To account for this non-linearity, we'll take the same approach as in the manuscript: treat transmission steps as a categorical instead of continuous variable. 
+
+```{r}
+t3.1 <- glmer(cum_hosts ~ steps * prop_pot_first_hosts + (steps+0|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts, index %in% spp), 
+            family = 'poisson'
+           )
+```
+
+This results in a much better model.
+
+```{r}
+anova(t3, t3.1)
+```
+
+As an aside, the model with the random slopes is much better than one without it.
+
+```{r}
+t3.0 <- glmer(cum_hosts ~ steps * prop_pot_first_hosts + (1|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts, index %in% spp),
+            family = 'poisson'
+           )
+anova(t3.0, t3.1)
+```
+
+
+Here is the model for species-level host range.
+
+```{r}
+t3.1 <- glmer(cum_hosts ~ steps * prop_pot_first_hosts + (steps+0|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts), 
+            family = 'poisson'
+           )
+```
+```{r}
+summary(t3.1)
+```
+
+After fitting that model, we can plot the expectations from this model, as we did above, but this time on the species-level data (i.e. Figure 2 in ms).
+
+```{r importdata}
+lcdb <- read.csv(file = "../../data/CLC_database_updated_names.csv", header = TRUE)
+dat <- read.csv(file = "../../data/spp_level_combined.csv", header = TRUE)
+tip_names <- read.csv(file = "../../data/data_tree_tips_table.csv")
+```
+```{r}
+dat <- left_join(dat, tip_names)
+dat <- left_join(dat, select(lcdb, Parasite.species, Parasite.group)%>%distinct())
+dat <- mutate(dat, lcl_max_fac = as.character(lcl_max))%>%
+  mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
+```
+```{r}
+# make variable to remove species with incomplete life cycle information
+incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
+  select(Parasite.species)%>%
+  distinct()
+dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "not facultative"),
+              partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
+                                           "partial", "complete"))
+```
+```{r}
+# # run this block to exclude species with partial life cycles! 
+dat <- filter(dat, partial_cycle != "partial")
+```
+
+```{r}
+#  calculate percent changes for different proportions of available first hosts infected
+fe <- t3.1@beta
+
+h1 <- fe[1] # first host
+h2 <- fe[2] # secon host
+h3 <- fe[3] # third host
+h4 <- fe[4] # fourt host
+pp <- fe[5]
+pph2 <- fe[6]
+pph3 <- fe[7]
+pph4 <- fe[8]
+
+
+for(p in seq(0.01, 1, by = 0.005)) {
+  
+  preds <- c(h1 + pp*p,
+             h1 + h2 + pp*p + pph2*p,
+             h1 + h3 + pp*p + pph3*p,
+             h1 + h4 + pp*p + pph4*p)
+  preds <- exp(preds)
+  # perc_change <- c( (preds[2] - preds[1])/preds[1],
+  #                   (preds[3] - preds[2])/preds[2],
+  #                   (preds[4] - preds[3])/preds[3]
+  #                   )
+  d <- as.data.frame(cbind(p, preds, Host.no = c(1,2,3,4)))
+  if(p == 0.01) {
+    d_out <- d
+  } else {
+    d_out <- bind_rows(d_out, d)
+  }
+}
+d_out <- rename(d_out, hosts = preds, perc = p)
+d_out <- mutate(d_out, Host.no = factor(Host.no, labels = c("1", "2", "3", "3+")))
+```
+
+The observed data do not match the expectations well. In particular, species counts continue to increase from 2 to 3 and 3 to 4 host cycles, whereas these level off in most food webs. In most food webs, there are few additional upstream hosts after two predation events.
+
+```{r}
+f1a <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+             aes(size = pubs_pubmed_spname_group)) +
+  geom_line(data = d_out,
+            aes(x = factor(Host.no), y = hosts, group = perc, color = perc, fill = NULL),
+            linetype = 'solid', alpha = 0.5) +
+  scale_y_log10(limits = c(0.95,max(dat$num_hosts_lcdb_nhm)), breaks = c(1, 5, 10, 25, 50, 100, 200, 400)) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits", color = "Proportion\nfirst hosts") +
+  guides(size = FALSE, color = FALSE) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm))
+f1a
+ggsave(f1a, filename = "../../figs/FigS6a.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
+ggsave(f1a, filename = "../../figs/FigS6a.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
+```
+
+
+### Taxonomic dissimilarity
+
+How does taxonomic dissimilarity accumulate? This metric is actually not cumulative. If two host species are from different phyla, and we add a third species from another phylum, the dissimilarity metric does not increase further because it is already at its maximum (i.e. host species are still, on average, from different phyla). When we plot taxonomic dissimilarity as parasites extend their life cycles, we see that it is pretty flat. Already in first hosts parasites tend to infect hosts from different classes or orders. Then, as they move to higher-level hosts the taxonomic dissimilarity stay constant, though it might decreases slightly as higher-level predators in a food web (i.e. vertebrates) are more taxonomically similar than lower-level consumers (i.e. invertebrates).
+
+```{r}
+figsx <- ggplot(filter(chains3_l, !is.na(hsi), web_study %in% most_relevant_studies2),
+       aes(x = step_int, y = cum_hsi)) +
+  geom_line(aes(group = index, color = prop_pot_first_hosts), alpha = 0.2) +
+  facet_wrap(~web_study) +
+  theme(panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 8),
+        strip.text = element_text(size = 6)) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Sequential predation events (host in cycle)", y = "Cumulative taxonomic dissim index", 
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
+figsx
+ggsave(figsx, filename = "../../figs/FigS5.svg", device = 'svg', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS5.png", device = 'png', width = 6, height = 4)
+rm(figsx)
+```
+
+We'll fit the same mixed model to this data to generate predictions for a typical food web.
+
+```{r}
+t4.0 <- lmer(cum_hsi ~ steps * prop_pot_first_hosts + (1|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts, index %in% spp)
+           )
+t4 <- lmer(cum_hsi ~ steps * prop_pot_first_hosts + (steps+0|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts, index %in% spp)
+           )
+```
+
+As for host range, this model is better when a random slopes term is included (life cycle step x study).
+
+```{r}
+anova(t4.0, t4)
+```
+
+Here are the parameters for the model:
+
+```{r}
+t4 <- lmer(cum_hsi ~ steps * prop_pot_first_hosts + (steps+0|web_study) + (1|fw),
+            data = chains3_l%>%
+              ungroup()%>%
+              filter(hosts != 0, web_study %in% webs_with_verts)
+           )
+```
+```{r}
+summary(t4)
+```
+
+```{r}
+#  calculate percent changes for different proportions of available first hosts infected
+fe <- t4@beta
+
+h1 <- fe[1] # first host
+h2 <- fe[2] # secon host
+h3 <- fe[3] # third host
+h4 <- fe[4] # fourt host
+pp <- fe[5]
+pph2 <- fe[6]
+pph3 <- fe[7]
+pph4 <- fe[8]
+
+
+for(p in seq(0.01, 1, by = 0.005)) {
+  
+  preds <- c(h1 + pp*p,
+             h1 + h2 + pp*p + pph2*p,
+             h1 + h3 + pp*p + pph3*p,
+             h1 + h4 + pp*p + pph4*p)
+  
+  d <- as.data.frame(cbind(p, preds, Host.no = c(1,2,3,4)))
+  if(p == 0.01) {
+    d_out <- d
+  } else {
+    d_out <- bind_rows(d_out, d)
+  }
+}
+d_out <- rename(d_out, hosts = preds, perc = p)
+d_out <- mutate(d_out, Host.no = factor(Host.no, labels = c("1", "2", "3", "3+")))
+```
+
+When we overlay expectations from the model on observed species-level generalism, we see that parasites usually use a more restricted range of hosts than expected from feeding relationships.
+
+```{r}
+f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+             aes(size = pubs_pubmed_spname_group)) +
+  geom_line(data = d_out,
+            aes(x = factor(Host.no), y = hosts, group = perc, color = perc, fill = NULL),
+            linetype = 'solid', alpha = 0.5) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index", size = "Pubmed hits",
+       color = "Proportion\nfirst hosts") +
+  guides(size = FALSE) +
+  theme(legend.position = c(0.98, 0.02),
+        legend.justification = c(1,0),
+        legend.background = element_rect(color = 'black'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb))
+f1b
+ggsave(f1b, filename = "../../figs/FigS6b.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
+ggsave(f1b, filename = "../../figs/FigS6b.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
+```
+
+
+### Correlation across stages
+### Host range
+
+What is the correlation across stages for our hypothetical parasites traversing food webs? If worms infect more first hosts, they are exposed to more potential second hosts. However, the relationship weakens and flattens as more first hosts are infected. 
+
+```{r}
+chains3 <- left_join(chains3, select(chains3_l, fw, web_study, prop_pot_first_hosts)%>%distinct())
+```
+```{r}
+ggplot(filter(chains3, web_study %in% most_relevant_studies2, second_hosts != 0),
+       aes(x = first_hosts, y = second_hosts, color = prop_pot_first_hosts)) +
+  geom_point(alpha = 0.33) +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  facet_wrap(~web_study, scales = 'free') +
+  theme(panel.grid.minor = element_blank()) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  labs(x = "First hosts", y = "Second hosts", color = "Proportion primary\nconsumers in food web\ninfected as first hosts",
+       title = "Number first hosts vs number second hosts")
+```
+
+In the next life cycle step, second to third host, the trend is often reversed, because parasites run out of next hosts.
+
+```{r}
+ggplot(filter(chains3, web_study %in% most_relevant_studies2, third_hosts != 0), 
+       aes(y = third_hosts, x = second_hosts, color = prop_pot_first_hosts)) +
+  geom_point() +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  facet_wrap(~web_study, scales = 'free') +
+  theme(panel.grid.minor = element_blank()) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  labs(x = "Second hosts", y = "Third hosts", color = "Proportion primary\nconsumers in food web\ninfected as first hosts",
+       title = "Number second hosts vs number third hosts")
+```
+
+Thus, the correlation between parasite stages caused by feeding relationships depends on whether parasites are at the bottom (positive correlations) or top (negative correlations) of the trophic pyramid and on whether many first hosts (negative) or few first hosts (positive) are infected. 
+
+For illustration, I'll plot one food web as a supplementary figure, again the Carpinteria Salt Marsh.
+
+```{r}
+s7a <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0),
+              aes(x = first_hosts, y = second_hosts, color = prop_pot_first_hosts)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  # facet_wrap(~web_study, scales = 'free') +
+  theme(panel.grid.minor = element_blank()) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  labs(x = "First hosts", y = "Second hosts", color = "Proportion\nfirst hosts"
+       ) +
+  annotate('text', label = "(a)",
+           x = min(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0)$first_hosts),
+           y = max(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0)$second_hosts)) +
+  theme(legend.position = c(0.98, 0.02),
+        legend.justification = c(1,0),
+        legend.background = element_rect(color = 'black'),
+        panel.grid.minor = element_blank()
+        ) 
+s7a
+ggsave(s7a, filename = "../../figs/FigS10a.svg", device = 'svg', height = 4, width = 4)
+```
+
+```{r}
+s7b <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", third_hosts != 0),
+              aes(y = third_hosts, x = second_hosts, color = prop_pot_first_hosts)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  # facet_wrap(~web_study, scales = 'free') +
+  theme(panel.grid.minor = element_blank()) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  labs(y = "Third hosts", x = "Second hosts", color = "Proportion primary\nconsumers in food web\ninfected as first hosts"
+       ) +
+  annotate('text', label = "(b)",
+           x = min(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0)$second_hosts),
+           y = max(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0)$third_hosts)) +
+  guides(color = F)
+s7b
+ggsave(s7b, filename = "../../figs/FigS10b.svg", device = 'svg', height = 4, width = 4)
+```
+
+### Taxonomic dissimilarity
+
+Unlike for species counts, the taxonomic dissimilarity of predators (second hosts) does not increase with that of prey (first hosts). In other words, parasites' potential next hosts are consistently from different orders or classes.
+
+```{r}
+ggplot(filter(chains3, web_study %in% most_relevant_studies2, second_hosts != 0),
+       aes(x = first_host_hsi, y = second_host_hsi, color = prop_pot_first_hosts)) +
+  geom_point() +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  facet_wrap(~web_study) +
+  theme(panel.grid.minor = element_blank()) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_continuous(limits = c(1,6), breaks = c(2,4,6), labels = c("genus", "order", "phylum")) +
+  labs(x = "First host taxonomic dissimilarity", y = "Second host taxonomic dissimilarity",
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts",
+       title = "Number first hosts vs number second hosts")
+```
+```{r}
+ggplot(filter(chains3, web_study %in% most_relevant_studies2, third_hosts != 0),
+       aes(y = third_host_hsi, x = second_host_hsi, color = prop_pot_first_hosts)) +
+  geom_point() +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  facet_wrap(~web_study) +
+  theme(panel.grid.minor = element_blank()) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_continuous(limits = c(1,6), breaks = c(2,4,6), labels = c("genus", "order", "phylum")) +
+  labs(x = "Second host taxonomic dissimilarity", y = "Third host taxonomic dissimilarity",
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts",
+       title = "Number second hosts vs number third hosts")
+```
+
+And for illustration, I'll plot just a single food web as a supplementary figure, again the Carpinteria Salt Marsh.
+
+```{r}
+s7c <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0),
+              aes(x = first_host_hsi, y = second_host_hsi, color = prop_pot_first_hosts)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  theme(panel.grid.minor = element_blank()) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_continuous(limits = c(1,6), breaks = c(2,4,6), labels = c("genus", "order", "phylum")) +
+  labs(x = "First host taxonomic dissimilarity", y = "Second host taxonomic dissimilarity",
+       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
+  annotate('text', label = "(c)",
+           x = 1, y = 6) +
+  guides(color = F)
+s7c
+ggsave(s7c, filename = "../../figs/FigS10c.svg", device = 'svg', height = 4, width = 4)
+```
+```{r}
+s7d <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0),
+              aes(y = third_host_hsi, x = second_host_hsi, color = prop_pot_first_hosts)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(aes(group = fw), se = F, linetype = 'dashed', color = 'black') +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_continuous(limits = c(1,6), breaks = c(2,4,6), labels = c("genus", "order", "phylum")) +
+  labs(x = "Second host taxonomic dissimilarity", y = "Third host taxonomic dissimilarity",
+       color = "Proportion\nfirst hosts") +
+  annotate('text', label = "(d)",
+           x = 1, y = 6) +
+  guides(color = F)
+s7d
+ggsave(s7d, filename = "../../figs/FigS10d.svg", device = 'svg', height = 4, width = 4) # combine S7 a to d into one plot
+```
+
+# Conclusions
+
+We placed hypothetical parasites into empirical food webs, varied the numbers of primary consumers they infected, and then examined how many *potential* hosts they encountered with sequential trophic transmission events. This exercise leads to concrete expectations about how parasite generalism may vary across life cycles. Let's compare expectations with observations
+
+## Species-level generalism
+### Host range
+
+**Expected**: Host range should increase initially before levelling off after 1 or 2 transmission events.
+
+**Observed**: Host range does not level off as quickly as expected, probably because worms with long life cycles use long trophic chains that may be underrepresented in the food web data.
+
+### Taxonomic dissimilarity
+
+**Expected**: If parasites randomly infected available hosts, they would usually infect hosts from different classes.
+
+**Observed**: Parasites tend to infect more taxonomically restricted range of hosts, especially when they have short life cycles.
+
+## Stage-level generalism
+### Host range
+
+**Expected**: Stage-level generalism can decrease with stage if many first hosts are infected, or it can initially increase if few hosts are infected before decreasing in latter stages.
+
+**Observed**: Confirming expectations, at least qualitatively, we observed high generalism in 'middle' hosts. 
+
+### Taxonomic dissimilarity
+
+**Expected**: Taxonomic dissimilarity was initially variable, then consistently high, before dropping off at latter stages.
+
+**Observed**: Taxonomic dissimilarity was, overall, lower than expected from food webs. The peak in 'middle' hosts was also observed.
+
+## Correlations amongst stages
+### Host range
+
+**Expected**: A positive correlation at the beginning of the life cycle, if parasites infect few first hosts (i.e. generalism radiates unconstrained), or a negative correlation at the end of the life cycle or if parasites infect many first hosts (i.e. generalism is constrained to decrease).
+
+**Observed**: No consistent correlations, though the expected correlations may emerge at higher taxonomic levels subject to less noise.
+
+### Taxonomic dissimilarity
+
+**Expected**: No correlation.
+
+**Observed**: No correlation.
+
+On the one hand, these analyses indicate that food web structure influences parasite host ranges. In particular, the peak generalism in 'middle' hosts is consistent with two opposing food web patterns (i.e. predators eating multiple prey and fewer predators at higher trophic levels). On the other hand, there is also evidence of constraints. Parasites consistently infect fewer host taxa than they likely encounter.  
+
