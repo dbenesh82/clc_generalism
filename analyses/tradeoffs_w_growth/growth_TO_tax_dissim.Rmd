@@ -1,0 +1,558 @@
+---
+title: "Look for tradeoffs driving host specificity"
+output: github_document
+---
+
+Why are complex life cycle parasites specific at one stage but not another? Here I explore tradeoffs that might affect the evolution of host specificity in complex life cycles.
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ape)
+library(RColorBrewer)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r importdata}
+lcdb <- read.csv(file = "../../data/CLC_database_updated_names.csv", header = TRUE)
+st_level <- read.csv(file = "../../data/stage_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "../parasite_phylogeny/full_tree_time_calib.nex")
+tree_tips <- read.csv(file = "../../data/data_tree_tips_table.csv")
+```
+
+[Elsewhere](../stage_level_analyses/make_stage_level_df.Rmd), I created a data table at the level of stages within parasite species. I start by looking at correlations between variables measured at this level, like host records, taxonomic dissimilarity, development time, growth, etc. Here's a correlation matrix, but it might not be too useful, because several variables need log transformation.
+
+```{r}
+round(cor(select(st_level, study_effort, num_hosts_suspicious_removed, hsi_lcdb_suspcious_rem, avg_dd, rel_growth_len, rel_growth_biov), use = "pairwise"),2)
+```
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+
+I calculated relative and absolute growth for parasite stages, as well as the time needed to complete development at a given stage, in days and degree days.
+
+```{r}
+# create starting sizes
+st_level <- rename(st_level, stage_length_end = stage_body_length, stage_biov_end = stage_biov)%>%
+  mutate(stage_length_start = stage_length_end - abs_growth_len,
+         stage_biov_start = stage_biov_end - abs_growth_biov)
+```
+
+There is less development time data than growth data. And growth was calculated with two different size variables: length and biovolume. Biovolume had more missing data, because biovolume was calculated with lengths and widths and there were more missing widths than lengths.
+
+```{r}
+sapply(select(st_level, avg_dt, avg_dd, abs_growth_len, abs_growth_biov), function(x){sum(is.na(x))})
+```
+
+Therefore, for any paratenic host stage without growth data, I set the growth to zero and then replotted the data. This makes the negative relationship clearer, especially for worms in intermediate hosts (since those are the paratenic hosts).
+
+```{r}
+st_level <- mutate(st_level, rel_growth_paratenic = if_else(Facultative == "paratenic" & is.na(rel_growth_biov), 0, rel_growth_biov)) # if paratenic, then dt = 0
+```
+
+```{r}
+st_level <- mutate(st_level, avg_dd_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dd), 20, avg_dd)) # if paratenic, then dt = 0
+```
+
+```{r}
+st_level <- mutate(st_level, rel_growth_rate_dt = rel_growth_biov/avg_dt, rel_growth_rate_dd = rel_growth_biov/avg_dd) # make growth rate variable
+```
+```{r}
+st_level <- mutate(st_level, Host_no_fac = if_else(Host.no > 4, as.integer(4), Host.no))%>%
+  mutate(Host_no_fac = factor(Host_no_fac))
+# center log-transformed study effort
+st_level <- mutate(st_level, zstudy_effort = log10(study_effort+1) - mean( log10(study_effort+1), na.rm=T))
+```
+
+
+# Models
+
+```{r}
+library(lme4)
+```
+
+I want to test whether life history variables can explain variation in generalism, which would be evidence for a tradeoff. There are several groups of variables to test in the model: (1) uninteresting confounders (phylogeny, study effort), (2) life cycle variables (def vs int, host number), and (3) life history variables (growth and development). I first add the uninteresting confounders to the model, simply to control for them and to be sure that variables added afterwards explain *additional* variation. Here, I'm mainly interested in the life history variables. I could add them to the model either before or after the life cycle variables. If I add them after, I'm testing whether life history explains variation beyond that explained by the life cycle. If I add them before, I'm testing for life history tradeoffs, but their effects are possibly dependent/confounded with life cycle characteristics. I'll take both approaches below.
+
+As for controlling for phylogeny, I added taxonomic categories into a linear mixed model. I did not include the highest and lower taxonomic levels (genus cuts the data quite thin while phylum is too coarse) as this improved model convergence. I still need to look at properly modelling phylogenetic effects
+
+```{r}
+r2_lmm_tax <- function(model) {
+  # take in compound poisson mixed model, return marginal and conditional R2, ala Nakagawa et al. 2017
+  # marginal r2 is just fixed effects
+  # condition r2 is fixed and rand effects combined
+  
+  # model call
+  call <- as.character(model@call)[2]
+  
+  # parameter estimates and df
+  fixed_param <- fixef(model)
+  df <- length(fixed_param) - 1
+  
+  # variance due to fixed effects
+  pred <- as.vector(model.matrix(model) %*% fixed_param) # predicteds on basis of just fixed effects
+  varF <- var(pred)
+  
+  
+  # variance due to rand effects
+  vc <- VarCorr(model)
+  varSp <- vc$Parasite.species[1]
+  if(length(vc) == 1){
+    varR <- varSp
+  } else {
+    varR <- vc$Parasite.species[1] + vc$parasite_genus[1] + vc$parasite_family[1] + vc$parasite_order[1] + vc$parasite_class[1] + vc$parasite_phylum[1]
+  }
+  
+  
+  # residual var
+  varE <- attr(vc, 'sc')^2
+  
+  
+  # marginal r2
+  mr2 <- varF/(varF + varR + varE)
+  
+  # conditional r2
+  cr2 <- (varF + varR)/(varF + varR + varE)
+  
+  # conditional r2
+  vexSP <- (varSp)/(varF + varR + varE)
+  
+  # output
+  out_frame <- data_frame(call = call, df = df, marg_r2 = round(mr2, 3), cond_r2 = round(cr2,3), varSp = round(vexSP,3))
+  return(out_frame)
+}
+```
+
+
+# Taxonomic dissimilarity
+
+
+Moving onto the next generalism variable: taxonomic dissimilarity.
+
+### Case 1
+#### Relative growth
+
+As above, adding relative growth to a model with just taxonomy and study effort is an improvement. It has about the same magnitude effect as study effort. 
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_biov))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + rel_growth_biov) # add rel growth
+anova(reg00, reg0, reg1, reg2)
+```
+
+Here are the parameters:
+
+```{r}
+summary(reg2)
+```
+
+
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "growth")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+The same pattern is seen if we assume worms do not grow in paratenic hosts, in fact the effect size is quite a bit larger.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_paratenic))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + rel_growth_paratenic) # add rel growth
+anova(reg00, reg0, reg1, reg2)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+#### Development time
+The taxonomic diversity of hosts is negatively related to developmental times (quick development - high generalism; long development - low generalism). 
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(avg_dd))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + log10(avg_dd)) # add devo
+anova(reg00, reg0, reg1, reg2)
+```
+
+Here are the parameters:
+```{r}
+summary(reg2)
+```
+
+And the R^2^.
+
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+This is strongly exacerbated by assuming minimal development in paratenic hosts. Short development and generalism are associated.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(avg_dd_paratenic))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + log10(avg_dd_paratenic)) # add devo
+anova(reg00, reg0, reg1, reg2)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+
+#### Relative growth rate
+
+Growth rate was unrelated to taxonomic dissimilarity, explaining no variation.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_rate_dd))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + rel_growth_rate_dd) # add rel growth
+anova(reg00, reg0, reg1, reg2)
+```
+
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "rel growth rate")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+The same pattern is seen if we assume worms do not grow in paratenic hosts. Growth rate does not differ for generalist vs specialist stages.
+
+```{r}
+st_level <- mutate(st_level, rel_growth_rate_paratenic = rel_growth_paratenic/avg_dd_paratenic) # make growth rate variable
+```
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_rate_paratenic))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + rel_growth_rate_paratenic) # add rel growth
+anova(reg00, reg0, reg1, reg2)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+
+### Case 2
+#### Relative growth
+
+Is the variation in taxonomic dissimilarity caused by life history variables simply due to life cycle characteristics? 
+
+In the series of models below, the distinction between intermediate vs definitive hosts is mildly significant and the host number matters (highest in second and third hosts). Adding relative growth is a clear improvement.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_biov))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + rel_growth_biov) # add stage level growth
+
+anova(reg0, reg1, reg4, reg5)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "stage function", "host number", "host x stage", "growth")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+The same results are seen under the assumption of limited growth in paratenic hosts.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_paratenic))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + rel_growth_paratenic) # add stage level growth
+
+anova(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "stage function", "host number", "host x stage", "growth")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+#### Development time
+
+Parasite stages with a taxonomically diverse set of hosts have slightly shorter development times, even after accounting for life cycle characteristics.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(avg_dd))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + log10(avg_dd)) # add stage level growth
+
+anova(reg00, reg0, reg1, reg4, reg5)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "stage function", "host number", "host x stage", "devo")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+When we assume development does not occur in paratenic hosts, the results appear stronger..
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(avg_dd_paratenic))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + log10(avg_dd_paratenic)) # add stage level growth
+
+anova(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "stage function", "host number", "host x stage", "growth")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+#### Relative growth rate
+
+Taxonomic dissimilarity is still not related to growth rate after accounting for other life cycle characteristics.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_rate_dd))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + rel_growth_rate_dd) # add stage level growth
+
+anova(reg00, reg0, reg1, reg4, reg5)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "stage function", "host number", "host x stage", "rel growth rate")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+The same results are seen under the assumption of limited growth in paratenic hosts.
+
+```{r}
+reg00 <- lmer(hsi_lcdb_suspcious_rem ~ 1 + (1|Parasite.species),
+             data = filter(st_level, !is.na(rel_growth_rate_paratenic))) # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + rel_growth_rate_paratenic) # add stage level growth
+
+anova(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+```
+```{r}
+mod_list <- list(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_lmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_lmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "stage function", "host number", "host x stage", "rel growth rate")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained, species_var_explained = varSp)
+r2_table
+```
+
+# Conclusions
+
+Parasite life cycle, life history, and patterns of host generalism are related. In particular, parasite exhibit high generalism in second or third intermediate hosts. These tend to be paratenic hosts, in which parasites undergo little growth and development. But even if these hosts are excluded, there is still a negative relationship between generalism and worm growth. Worms grow less in stages where they infect a broader range of hosts, which is consistent with costs of generalism.
