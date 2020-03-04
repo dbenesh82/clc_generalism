@@ -745,6 +745,213 @@ do not, the model considers them specialists.
     ## 32 -0.2060438        Lytocestidae_1_int  bottom 10%
     ## 33 -0.2054245      Crenosomatidae_2_int  bottom 10%
 
+# Cross-stage tradeoffs
+
+The taxonomic analyses suggest that species or taxa are not consistent
+generalists across the full life cycle, which is not consistent with the
+idea of generalism begetting generalism. Rather certain stages may
+generalist while others specialist - there may be a tradeoff. This would
+not be detectable from the variance components, as taxonomic groups
+would not have consistent (high or low) generalism.
+
+Let’s update the models to test for tradeoffs. Specifically, we ask if
+generalism at the current stage is determined by generalism at the
+previous stage, either positively or negatively. To examine this, we
+need to restrict our data to just species with multi-stage life cycles.
+This reduces the data by about half.
+
+Number of stages:
+
+    ## [1] 967
+
+We fit the same series of models to account for taxonomy, study effort,
+stage function (def vs int host), and host number. The results from
+likelihood ratio tests are comparable to those with the full dataset.
+Essentially all the terms have an effect on generalism.
+
+    ## Data: filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  ...
+    ## Models:
+    ## reg0f: num_hosts_suspicious_removed ~ 1 + (1 | obs)
+    ## reg1f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species)
+    ## reg2f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg2f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg2f:     (1 | parasite_class) + (1 | parasite_phylum)
+    ## reg3f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg3f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg3f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort
+    ## reg4f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg4f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg4f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg4f:     Def.int
+    ## reg5f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg5f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg5f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg5f:     Def.int + Host_no_fac
+    ## reg6f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg6f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg6f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg6f:     Def.int + Host_no_fac + Def.int:Host_no_fac
+    ##       Df    AIC    BIC  logLik deviance    Chisq Chi Df Pr(>Chisq)    
+    ## reg0f  2 4849.1 4858.8 -2422.5   4845.1                               
+    ## reg1f  3 4833.7 4848.3 -2413.8   4827.7  17.3888      1  3.046e-05 ***
+    ## reg2f  8 4806.8 4845.8 -2395.4   4790.8  36.8987      5  6.276e-07 ***
+    ## reg3f  9 4693.0 4736.9 -2337.5   4675.0 115.7149      1  < 2.2e-16 ***
+    ## reg4f 10 4671.0 4719.8 -2325.5   4651.0  24.0276      1  9.496e-07 ***
+    ## reg5f 12 4663.9 4722.4 -2320.0   4639.9  11.0844      2   0.003918 ** 
+    ## reg6f 14 4662.3 4730.5 -2317.1   4634.3   5.6726      2   0.058642 .  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Next, we add the number of hosts in the previous stage to the model. The
+relationship could be either positive (generalism begets generalism),
+negative (tradeoffs), or absent (stage to stage differences cancel out
+the overall effect). The term is weakly positive.
+
+    ## Generalized linear mixed model fit by maximum likelihood (Laplace
+    ##   Approximation) [glmerMod]
+    ##  Family: poisson  ( log )
+    ## Formula: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) +  
+    ##     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) +  
+    ##     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort +  
+    ##     Def.int + Host_no_fac + log(prev_hosts) + Def.int:Host_no_fac
+    ##    Data: 
+    ## filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  
+    ##     !is.na(prev_hosts))
+    ## 
+    ##      AIC      BIC   logLik deviance df.resid 
+    ##   4659.3   4732.4  -2314.6   4629.3      952 
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.4797 -0.5478 -0.1202  0.3311  1.2050 
+    ## 
+    ## Random effects:
+    ##  Groups           Name        Variance  Std.Dev.
+    ##  obs              (Intercept) 3.181e-01 0.564001
+    ##  Parasite.species (Intercept) 2.241e-03 0.047343
+    ##  parasite_genus   (Intercept) 1.025e-02 0.101231
+    ##  parasite_family  (Intercept) 8.337e-02 0.288736
+    ##  parasite_order   (Intercept) 2.524e-04 0.015887
+    ##  parasite_class   (Intercept) 9.338e-06 0.003056
+    ##  parasite_phylum  (Intercept) 2.100e-05 0.004582
+    ## Number of obs: 967, groups:  
+    ## obs, 967; Parasite.species, 803; parasite_genus, 336; parasite_family, 99; parasite_order, 30; parasite_class, 6; parasite_phylum, 3
+    ## 
+    ## Fixed effects:
+    ##                         Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept)              1.05944    0.06304  16.804  < 2e-16 ***
+    ## zstudy_effort            0.40975    0.04597   8.914  < 2e-16 ***
+    ## Def.intint               0.35944    0.08143   4.414 1.02e-05 ***
+    ## Host_no_fac3             0.09585    0.07908   1.212  0.22553    
+    ## Host_no_fac4            -0.52932    0.17281  -3.063  0.00219 ** 
+    ## log(prev_hosts)          0.07767    0.03359   2.312  0.02077 *  
+    ## Def.intint:Host_no_fac3 -0.42878    0.17841  -2.403  0.01625 *  
+    ## Def.intint:Host_no_fac4 -0.53268    0.57226  -0.931  0.35194    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Correlation of Fixed Effects:
+    ##             (Intr) zstdy_ Df.ntn Hst__3 Hst__4 lg(p_) D.:H__3
+    ## zstudy_ffrt  0.217                                           
+    ## Def.intint  -0.276 -0.144                                    
+    ## Host_no_fc3 -0.232 -0.018  0.373                             
+    ## Host_no_fc4 -0.159 -0.112  0.286  0.195                      
+    ## lg(prv_hst) -0.498 -0.398 -0.075 -0.185 -0.026               
+    ## Df.ntn:H__3  0.137 -0.005 -0.326 -0.402  0.137 -0.028        
+    ## Df.ntn:H__4  0.074  0.046 -0.135 -0.038 -0.216 -0.057  0.058 
+    ## convergence code: 0
+    ## Model failed to converge with max|grad| = 0.519607 (tol = 0.001, component 1)
+
+Let’s allow this effect to differ by life stage. That is, perhaps the
+relationship for the 1st to 2nd host differs from that for the 2nd to
+3rd hosts. And then we’ll expand it once more by acknowledging that a
+transition to a definitive host might differ from a transition to an
+intermediate host. Next are the likelihood ratio tests showing (i) the
+mildly significant effect of generality at previous stage, (ii) the
+weakly insignificant effect of allowing this effect to vary across the
+life cycle, and (iii) the insignificant effect of allowing the effect to
+depend on stage and on whether the next host is an intermediate or
+definitive host.
+
+    ## Data: filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  ...
+    ## Models:
+    ## reg6f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg6f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg6f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg6f:     Def.int + Host_no_fac + Def.int:Host_no_fac
+    ## reg7f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg7f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg7f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg7f:     Def.int + Host_no_fac + log(prev_hosts) + Def.int:Host_no_fac
+    ## reg8f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg8f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg8f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg8f:     Def.int + Host_no_fac + log(prev_hosts) + Def.int:Host_no_fac + 
+    ## reg8f:     Host_no_fac:log(prev_hosts)
+    ## reg9f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg9f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg9f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg9f:     Def.int + Host_no_fac + log(prev_hosts) + Def.int:Host_no_fac + 
+    ## reg9f:     Host_no_fac:log(prev_hosts) + Def.int:log(prev_hosts) + Def.int:Host_no_fac:log(prev_hosts)
+    ##       Df    AIC    BIC  logLik deviance  Chisq Chi Df Pr(>Chisq)  
+    ## reg6f 14 4662.3 4730.5 -2317.1   4634.3                           
+    ## reg7f 15 4659.3 4732.4 -2314.6   4629.3 4.9807      1    0.02563 *
+    ## reg8f 17 4659.3 4742.2 -2312.7   4625.3 3.9496      2    0.13879  
+    ## reg9f 20 4660.1 4757.6 -2310.1   4620.1 5.1946      3    0.15809  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Here is a simpler likelihood ratio test. It compares the model without
+previous stage generalism with the model including previous stage and
+all its interactions.
+
+    ## Data: filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  ...
+    ## Models:
+    ## reg6f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg6f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg6f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg6f:     Def.int + Host_no_fac + Def.int:Host_no_fac
+    ## reg9f: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg9f:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg9f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg9f:     Def.int + Host_no_fac + log(prev_hosts) + Def.int:Host_no_fac + 
+    ## reg9f:     Host_no_fac:log(prev_hosts) + Def.int:log(prev_hosts) + Def.int:Host_no_fac:log(prev_hosts)
+    ##       Df    AIC    BIC  logLik deviance  Chisq Chi Df Pr(>Chisq)  
+    ## reg6f 14 4662.3 4730.5 -2317.1   4634.3                           
+    ## reg9f 20 4660.1 4757.6 -2310.1   4620.1 14.125      6    0.02827 *
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+The R<sup>2</sup> table shows that taxonomy and study effort have clear
+affects. Life cycle characteristics are also important, explaining about
+3% of the variation. Adding generality at the previous stage explains an
+additional 1% of the variation.
+
+    ## # A tibble: 9 x 6
+    ##   step                 df_used marg_r2 cond_r2 sp_var_explained tax_var_explain~
+    ##   <chr>                  <dbl>   <dbl>   <dbl>            <dbl>            <dbl>
+    ## 1 within-species            NA   0       0.191            0.191            0.191
+    ## 2 taxonomy                   0   0       0.202            0.081            0.202
+    ## 3 study effort               1   0.131   0.242            0                0.111
+    ## 4 stage function             1   0.156   0.26             0                0.104
+    ## 5 host number                2   0.156   0.271            0                0.115
+    ## 6 stage x host num           2   0.155   0.28             0                0.125
+    ## 7 previous stage gene~       1   0.162   0.276            0.003            0.114
+    ## 8 previous stage x ho~       2   0.164   0.301            0.006            0.137
+    ## 9 previous stage x ho~       3   0.166   0.3              0                0.134
+
+To get a feel for the patterns, we can plot the model predictions. We
+get the expected relationship between previous stage generalism and
+current stage generalism controlling for study effort (average) and
+taxonomy (unconditional predictions).
+
+The dotted lines represent the predicted relationships at a typical
+study effort. They vary in a way expected from the simulations in that
+the relationship is positive at the beginning of the life cycle and then
+negative at the end. But the pattern is quite weak overall.
+
+![](stage_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-72-1.png)<!-- -->
+
 # Conclusions
 
 We determined that a generalized linear mixed model with Poisson errors
@@ -763,4 +970,9 @@ consistently generalist. Rather, differences among taxa tend to be
 driven by certain generalist stages. We confirmed this by adding a stage
 by taxa (family) interaction to the model, which explained and
 additional \~13% of the variation. This suggests that particular taxa
-may diverge from the observed trends across stages.
+may diverge from the observed trends across stages. Finally, we assessed
+cross-stage tradeoffs. We compared whether generalism at the previous
+stage was related to generalism at the current stage, which reduced the
+dataset by about half. The trends followed the pattern expected from
+life cycle simulations, but only weakly, suggesting that there are not
+obvious tradeoffs between stages.

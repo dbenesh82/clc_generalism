@@ -119,6 +119,9 @@ But before fitting a series of models for hypothesis testing, let's try differen
 # center log-transformed study effort
 hosts_per_stage <- mutate(hosts_per_stage, zstudy_effort = 
                 log10(study_effort+1) - mean( log10(study_effort+1), na.rm=T))
+# hosts_per_stage <- mutate(hosts_per_stage, zstudy_effort =
+#                 log10(study_effort+1) - quantile(log10(study_effort+1), probs = 0.75) )
+
 hosts_per_stage$obs <- factor(1:length(hosts_per_stage$Parasite.species)) # observation level effect for quantifying overdispersion
 ```
 
@@ -580,8 +583,8 @@ syc <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
   theme(panel.grid.minor = element_blank()) +
   guides(color = FALSE)
 syc
-# ggsave(syc, filename = "../../figs/FigS2c.png", device = 'png', width = 4.5, height = 4.5)
-ggsave(syc, filename = "../../figs/FigS2c.svg", device = 'svg', width = 4.5, height = 4.5)
+# ggsave(syc, filename = "../../figs/FigS9c.png", device = 'png', width = 4.5, height = 4.5)
+ggsave(syc, filename = "../../figs/FigS9c.svg", device = 'svg', width = 4.5, height = 4.5)
 ```
 
 So to understand what causes the taxonomic effect in the model, let's look at families. We'll take the random effect estimates for parasite family from the model accounting for study effort, stage number, and stage function. Then, we'll sort them to see which families rank high (generalists) or low (specialists). 
@@ -695,7 +698,7 @@ sx <- ggplot(filter(hosts_per_stage, parasite_family %in% rx$family[1:12], Facul
   facet_wrap(~parasite_family) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank())
-ggsave(sx, filename = "../../figs/FigS3.png", device = 'png', width = 7, height = 7)
+ggsave(sx, filename = "../../figs/FigS10.png", device = 'png', width = 7, height = 7)
 ```
 
 Similarly, when we make the same plot for the 12 most specialized families according to the model, we see that some stages infect far fewer hosts than expected. Some stages, though, are as generalist as expected, which suggests that taxa differ because particular stages are more or less generalist than expected, not necessarily because the taxon is consistently generalist (or specialists) across the full life cycle.
@@ -836,9 +839,136 @@ rxx <- select(rxx, Family, Stage, Random_effect = re)
 write.csv(rxx, file = "generalist_stages_host_range_TableS2.csv", row.names = FALSE)
 ```
 
+# Cross-stage tradeoffs
+
+The taxonomic analyses suggest that species or taxa are not consistent generalists across the full life cycle, which is not consistent with the idea of generalism begetting generalism. Rather certain stages may generalist while others specialist - there may be a tradeoff. This would not be detectable from the variance components, as taxonomic groups would not have consistent (high or low) generalism. 
+
+Let's update the models to test for tradeoffs. Specifically, we ask if generalism at the current stage is determined by generalism at the previous stage, either positively or negatively. To examine this, we need to restrict our data to just species with multi-stage life cycles. This reduces the data by about half.
+
+```{r}
+prev_stage <- select(hosts_per_stage, Parasite.species, Host.no, prev_hosts = num_hosts_suspicious_removed)%>%
+  mutate(Host.no = Host.no + 1)
+hosts_per_stage <- left_join(hosts_per_stage, prev_stage)
+```
+
+Number of stages: 
+
+```{r}
+length(filter(hosts_per_stage, Facultative != 'postcyclic', !is.na(hsi_lcdb_suspcious_rem), !is.na(prev_hosts) )$Parasite.species)
+```
+
+We fit the same series of models to account for taxonomy, study effort, stage function (def vs int host), and host number. The results from likelihood ratio tests are comparable to those with the full dataset. Essentially all the terms have an effect on generalism.
+
+```{r}
+# # can re-run GLMER models if needed, e.g to do likelihood ratio tests
+reg0f <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs),
+            data = filter(hosts_per_stage, Facultative != 'postcyclic', !is.na(hsi_lcdb_suspcious_rem), !is.na(prev_hosts) ),
+            family = 'poisson'
+            )
+reg1f <- update(reg0f, . ~ . + (1|Parasite.species) ) # add within-species RE
+reg2f <- update(reg1f, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum)) # add taxonomy
+reg3f <- update(reg2f, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg4f <- update(reg3f, . ~ . + Def.int) # distinguish adults and larvae
+reg5f <- update(reg4f, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg6f <- update(reg5f, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg7f <- update(reg6f, . ~ . + log(prev_hosts))
+reg8f <- update(reg7f, . ~ . + log(prev_hosts)*Host_no_fac)
+reg9f <- update(reg8f, . ~ . + log(prev_hosts)*Host_no_fac*Def.int)
+```
+```{r}
+anova(reg0f, reg1f, reg2f, reg3f, reg4f, reg5f, reg6f)
+```
+
+Next, we add the number of hosts in the previous stage to the model. The relationship could be either positive (generalism begets generalism), negative (tradeoffs), or absent (stage to stage differences cancel out the overall effect). The term is weakly positive.
+
+```{r}
+summary(reg7f)
+```
+
+Let's allow this effect to differ by life stage. That is, perhaps the relationship for the 1st to 2nd host differs from that for the 2nd to 3rd hosts. And then we'll expand it once more by acknowledging that a transition to a definitive host might differ from a transition to an intermediate host. Next are the likelihood ratio tests showing (i) the mildly significant effect of generality at previous stage, (ii) the weakly insignificant effect of allowing this effect to vary across the life cycle, and (iii) the insignificant effect of allowing the effect to depend on stage and on whether the next host is an intermediate or definitive host.
+
+```{r}
+anova(reg6f, reg7f, reg8f, reg9f)
+```
+
+Here is a simpler likelihood ratio test. It compares the model without previous stage generalism with the model including previous stage and all its interactions.
+
+```{r}
+anova(reg6f, reg9f)
+```
+
+The R^2^ table shows that taxonomy and study effort have clear affects. Life cycle characteristics are also important, explaining about 3% of the variation. Adding generality at the previous stage explains an additional 1% of the variation.
+
+```{r}
+mod_list <- list(reg1f, reg2f, reg3f, reg4f, reg5f, reg6f, reg7f, reg8f, reg9f)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_glmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_glmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species", "taxonomy", "study effort", "stage function", "host number", "stage x host num",
+                   "previous stage generalism", "previous stage x host number", "previous stage x host number x stage function")
+r2_table <- dplyr::select(r2_table, step, df_used, marg_r2, cond_r2, sp_var_explained, tax_var_explained)
+r2_table
+```
+
+To get a feel for the patterns, we can plot the model predictions. We get the expected relationship between previous stage generalism and current stage generalism controlling for study effort (average) and taxonomy (unconditional predictions).
+
+```{r}
+nd <- expand.grid(prev_hosts = seq(min(hosts_per_stage$num_hosts_suspicious_removed, na.rm = T),
+                                   max(hosts_per_stage$num_hosts_suspicious_removed, na.rm = T), by = 1),
+                  Host_no_fac = unique(hosts_per_stage$Host_no_fac)[-1], 
+                  Def.int = unique(hosts_per_stage$Def.int))
+nd$zstudy_effort <- 0
+nd$preds <- exp(predict(reg9f, newdata = nd, re.form = NA))
+```
+```{r}
+# group_by(hosts_per_stage, Host_no_fac, Def.int)%>%
+#   filter(!is.na(prev_hosts))%>%
+#   summarize(min_hr = min(prev_hosts, na.rm = T), max_hr = max(prev_hosts, na.rm = T))
+
+# filter to just those values in observed data
+nd <- filter(nd,
+             !(Host_no_fac == "2" & Def.int == 'def' & prev_hosts > 36), 
+             !(Host_no_fac == "2" & Def.int == 'int' & prev_hosts > 49), 
+             !(Host_no_fac == "3" & Def.int == 'def' & prev_hosts > 30), 
+             !(Host_no_fac == "3" & Def.int == 'int' & prev_hosts > 104), 
+             !(Host_no_fac == "4" & Def.int == 'def' & prev_hosts > 31), 
+             !(Host_no_fac == "4" & Def.int == 'int' & prev_hosts < 17),
+             !(Host_no_fac == "4" & Def.int == 'int' & prev_hosts > 23)
+             )
+```
+
+The dotted lines represent the predicted relationships at a typical study effort. They vary in a way expected from the simulations in that the relationship is positive at the beginning of the life cycle and then negative at the end. But the pattern is quite weak overall. 
+
+```{r}
+f3a <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', !is.na(hsi_lcdb_suspcious_rem), !is.na(prev_hosts) ),
+              aes(x = prev_hosts, y = num_hosts_suspicious_removed, color = Def.int)) + 
+  geom_point(alpha = 0.2, aes(size = study_effort)) +
+  scale_x_log10(breaks = c(1, 2, 5, 10, 25, 50, 100)) + 
+  scale_y_log10(breaks = c(1, 2, 5, 10, 25, 50, 100)) +
+  scale_color_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Number of host species, stage n", y = "Number of host species, stage n+1") +
+  theme(panel.grid.minor = element_blank()) +
+  guides(size = FALSE) +
+  # geom_text(data = filter(hs_nlong, step == "1st to 2nd", ns1 == min(hs_nlong$ns1), ns2 == max(hs_nlong$ns2)), label = "(a)") +
+  facet_wrap(~Host_no_fac) +
+  geom_line(data = nd, aes(x = prev_hosts, y = preds, color = Def.int), 
+            linetype = 'dashed')
+f3a
+```
+
 
 # Conclusions
 
-We determined that a generalized linear mixed model with Poisson errors performs better on host species counts than other models. Moreover, a model accounting for overdispersion was an improvement. Using this as the model structure, we fit a series of models to test hypotheses. We found that, after accounting for study effort, generalism was higher in intermediate than definitive hosts and it was higher in 2nd and 3rd hosts compared to 1st hosts. In other words, the middle intermediate hosts in long life cycles are characterized by wide host ranges. After accounting for life cycle characteristics, parasite taxonomy still explained some of the variation in host range. This was mainly due to differences among parasite genera and families; higher taxonomic levels explained less variation. Yet, parasite families (or genera) are not consistently generalist. Rather, differences among taxa tend to be driven by certain generalist stages. We confirmed this by adding a stage by taxa (family) interaction to the model, which explained and additional ~13% of the variation. This suggests that particular taxa may diverge from the observed trends across stages.
+We determined that a generalized linear mixed model with Poisson errors performs better on host species counts than other models. Moreover, a model accounting for overdispersion was an improvement. Using this as the model structure, we fit a series of models to test hypotheses. We found that, after accounting for study effort, generalism was higher in intermediate than definitive hosts and it was higher in 2nd and 3rd hosts compared to 1st hosts. In other words, the middle intermediate hosts in long life cycles are characterized by wide host ranges. After accounting for life cycle characteristics, parasite taxonomy still explained some of the variation in host range. This was mainly due to differences among parasite genera and families; higher taxonomic levels explained less variation. Yet, parasite families (or genera) are not consistently generalist. Rather, differences among taxa tend to be driven by certain generalist stages. We confirmed this by adding a stage by taxa (family) interaction to the model, which explained and additional ~13% of the variation. This suggests that particular taxa may diverge from the observed trends across stages. Finally, we assessed cross-stage tradeoffs. We compared whether generalism at the previous stage was related to generalism at the current stage, which reduced the dataset by about half. The trends followed the pattern expected from life cycle simulations, but only weakly, suggesting that there are not obvious tradeoffs between stages.
 
 

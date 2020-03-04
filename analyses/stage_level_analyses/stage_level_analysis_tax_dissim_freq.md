@@ -655,6 +655,213 @@ families.
     ## 32 -0.2401232      Cystidicolidae_2_int  bottom 10%
     ## 33 -0.2393760     Thelastomatidae_1_def  bottom 10%
 
+# Cross-stage tradeoffs
+
+The taxonomic analyses suggest that species or taxa are not consistent
+generalists across the full life cycle, which is not consistent with the
+idea that generalism begets generalism. Rather certain stages may
+generalist while others specialist - there may be a tradeoff. This would
+not be detectable from the variance components, as taxonomic groups
+would not have consistent (high or low) generalism.
+
+Let’s update the models to test for tradeoffs. Specifically, we ask if
+generalism at the current stage is determined by generalism at the
+previous stage, either positively or negatively. To examine this, we
+need to restrict our data to just species with multi-stage life cycles.
+This reduces the data by about half.
+
+Number of stages:
+
+    ## [1] 967
+
+We fit the same series of models to account for taxonomy, study effort,
+stage function (def vs int host), and host number. The results from
+likelihood ratio tests are different than those from the full dataset.
+Specifically, there is no effect of host number on generalism.
+
+    ## Data: filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  ...
+    ## Models:
+    ## reg1f: hsi_lcdb_suspcious_rem ~ 1 + (1 | Parasite.species)
+    ## reg2f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg2f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg2f:     (1 | parasite_phylum)
+    ## reg3f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg3f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg3f:     (1 | parasite_phylum) + zstudy_effort
+    ## reg4f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg4f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg4f:     (1 | parasite_phylum) + zstudy_effort + Def.int
+    ## reg5f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg5f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg5f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac
+    ## reg6f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg6f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg6f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg6f:     Def.int:Host_no_fac
+    ##       Df    AIC    BIC  logLik deviance    Chisq Chi Df Pr(>Chisq)    
+    ## reg1f  3 2932.6 2947.2 -1463.3   2926.6                               
+    ## reg2f  8 2842.7 2881.7 -1413.4   2826.7  99.8686      5  < 2.2e-16 ***
+    ## reg3f  9 2778.8 2822.7 -1380.4   2760.8  65.9366      1  4.657e-16 ***
+    ## reg4f 10 2626.7 2675.4 -1303.3   2606.7 154.0990      1  < 2.2e-16 ***
+    ## reg5f 12 2628.7 2687.1 -1302.3   2604.7   2.0385      2     0.3609    
+    ## reg6f 14 2631.4 2699.7 -1301.7   2603.4   1.1932      2     0.5507    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+When we plot this, we see why. For a given life cycle step, generalism
+is lower for definitive hosts, and this difference is consistent.
+
+![](stage_level_analysis_tax_dissim_freq_files/figure-gfm/unnamed-chunk-66-1.png)<!-- -->
+
+Next, we add the taxonomic dissimilarity of hosts in the previous stage
+to the model. The relationship could be either positive (generalism
+begets generalism), negative (tradeoffs), or absent (stage to stage
+differences cancel out any overall effect). The term is positive but
+weak.
+
+    ## Linear mixed model fit by REML ['lmerMod']
+    ## Formula: 
+    ## hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) +  
+    ##     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) +  
+    ##     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac +  
+    ##     prev_hsi + Def.int:Host_no_fac
+    ##    Data: 
+    ## filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  
+    ##     !is.na(prev_hsi))
+    ## 
+    ## REML criterion at convergence: 2620
+    ## 
+    ## Scaled residuals: 
+    ##      Min       1Q   Median       3Q      Max 
+    ## -2.85028 -0.62927 -0.08197  0.63077  2.71791 
+    ## 
+    ## Random effects:
+    ##  Groups           Name        Variance  Std.Dev. 
+    ##  Parasite.species (Intercept) 2.429e-09 4.928e-05
+    ##  parasite_genus   (Intercept) 7.144e-02 2.673e-01
+    ##  parasite_family  (Intercept) 1.986e-02 1.409e-01
+    ##  parasite_order   (Intercept) 1.892e-02 1.376e-01
+    ##  parasite_class   (Intercept) 9.345e-02 3.057e-01
+    ##  parasite_phylum  (Intercept) 0.000e+00 0.000e+00
+    ##  Residual                     7.818e-01 8.842e-01
+    ## Number of obs: 967, groups:  
+    ## Parasite.species, 803; parasite_genus, 336; parasite_family, 99; parasite_order, 30; parasite_class, 6; parasite_phylum, 3
+    ## 
+    ## Fixed effects:
+    ##                         Estimate Std. Error t value
+    ## (Intercept)              1.82354    0.15946  11.436
+    ## zstudy_effort            0.32408    0.04995   6.489
+    ## Def.intint               1.09881    0.09544  11.513
+    ## Host_no_fac3             0.06893    0.09204   0.749
+    ## Host_no_fac4            -0.20990    0.19517  -1.075
+    ## prev_hsi                 0.04928    0.02821   1.747
+    ## Def.intint:Host_no_fac3 -0.16511    0.22104  -0.747
+    ## Def.intint:Host_no_fac4  0.57369    0.69430   0.826
+    ## 
+    ## Correlation of Fixed Effects:
+    ##             (Intr) zstdy_ Df.ntn Hst__3 Hst__4 prv_hs D.:H__3
+    ## zstudy_ffrt  0.102                                           
+    ## Def.intint  -0.138 -0.182                                    
+    ## Host_no_fc3 -0.054 -0.054  0.330                             
+    ## Host_no_fc4 -0.033 -0.102  0.240  0.200                      
+    ## prev_hsi    -0.332 -0.209 -0.022 -0.264 -0.134               
+    ## Df.ntn:H__3  0.068  0.009 -0.349 -0.371  0.146 -0.043        
+    ## Df.ntn:H__4  0.022  0.023 -0.146 -0.050 -0.217  0.001  0.039 
+    ## convergence code: 0
+    ## boundary (singular) fit: see ?isSingular
+
+Let’s allow this effect to differ by life stage. That is, perhaps the
+relationship for the transition between 1st and 2nd host differs from
+that between 2nd and 3rd hosts. And then we’ll expand it once more by
+acknowledging that a transition to a definitive host might differ from a
+transition to an intermediate host. Here are the likelihood ratio tests
+showing (i) the borderline significant effect of generality at previous
+stage, (ii) the significant effect of allowing this effect to vary
+across the life cycle, and (iii) the weakly significant effect of
+allowing the effect to depend on stage and on whether the next host is
+an intermediate or definitive host.
+
+    ## Data: filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  ...
+    ## Models:
+    ## reg6f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg6f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg6f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg6f:     Def.int:Host_no_fac
+    ## reg7f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg7f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg7f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg7f:     prev_hsi + Def.int:Host_no_fac
+    ## reg8f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg8f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg8f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg8f:     prev_hsi + Def.int:Host_no_fac + Host_no_fac:prev_hsi
+    ## reg9f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg9f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg9f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg9f:     prev_hsi + Def.int:Host_no_fac + Host_no_fac:prev_hsi + Def.int:prev_hsi + 
+    ## reg9f:     Def.int:Host_no_fac:prev_hsi
+    ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
+    ## reg6f 14 2631.4 2699.7 -1301.7   2603.4                              
+    ## reg7f 15 2630.4 2703.5 -1300.2   2600.4  3.0451      1  0.0809833 .  
+    ## reg8f 17 2619.8 2702.7 -1292.9   2585.8 14.5584      2  0.0006897 ***
+    ## reg9f 20 2615.4 2712.8 -1287.7   2575.4 10.4889      3  0.0148367 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Here is a simpler likelihood ratio test. It compares the model without
+previous stage generalism with the model including previous stage and
+all its interactions.
+
+    ## Data: filter(hosts_per_stage, Facultative != "postcyclic", !is.na(hsi_lcdb_suspcious_rem),  ...
+    ## Models:
+    ## reg6f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg6f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg6f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg6f:     Def.int:Host_no_fac
+    ## reg9f: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg9f:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg9f:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg9f:     prev_hsi + Def.int:Host_no_fac + Host_no_fac:prev_hsi + Def.int:prev_hsi + 
+    ## reg9f:     Def.int:Host_no_fac:prev_hsi
+    ##       Df    AIC    BIC  logLik deviance  Chisq Chi Df Pr(>Chisq)    
+    ## reg6f 14 2631.4 2699.7 -1301.7   2603.4                             
+    ## reg9f 20 2615.4 2712.8 -1287.7   2575.4 28.092      6  9.028e-05 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+The R<sup>2</sup> table shows that taxonomy and study effort have clear
+affects. Life cycle characteristics are also important, explaining over
+10% of the variation. Adding generality at the previous stage explains
+an additional 1.5% of the variation.
+
+    ## # A tibble: 9 x 6
+    ##   step                 df_used marg_r2 cond_r2 sp_var_explained tax_var_explain~
+    ##   <chr>                  <dbl>   <dbl>   <dbl>            <dbl>            <dbl>
+    ## 1 within-species            NA   0       0.071            0.071            0.071
+    ## 2 taxonomy                   0   0       0.208            0                0.208
+    ## 3 study effort               1   0.076   0.25             0                0.174
+    ## 4 stage function             1   0.216   0.38             0                0.164
+    ## 5 host number                2   0.218   0.383            0                0.165
+    ## 6 stage x host num           2   0.216   0.384            0                0.168
+    ## 7 previous stage gene~       1   0.219   0.381            0                0.162
+    ## 8 previous stage x ho~       2   0.226   0.411            0                0.185
+    ## 9 previous stage x ho~       3   0.231   0.419            0                0.188
+
+To get a feel for the patterns, we can plot the model predictions. We
+get the expected relationship between previous stage generalism and
+current stage generalism controlling for study effort (average) and
+taxonomy (unconditional predictions).
+
+The dotted lines represent the predicted relationships at a typical
+study effort. Transitions from intermediate to definitive host vary in a
+way expected from the simulations in that the relationship is positive
+at the beginning of the life cycle and then negative at the end.
+Intermediate to intermediate transmissions tend to be positive,
+consistent with the idea of generalism begetting generalism, though
+there are deviations from these expectations.
+
+![](stage_level_analysis_tax_dissim_freq_files/figure-gfm/unnamed-chunk-73-1.png)<!-- -->
+
 # Conclusions
 
 We determined that a linear mixed model was appropriate for the data,
@@ -679,4 +886,8 @@ stages seem to be consistently generalist in particular taxa. We
 confirmed this by adding a stage by taxa (family) interaction to the
 model, which explained and additional \~10% of the variation. This
 suggests that particular taxa may diverge from the observed trends
-across stages.
+across stages. Finally, we assessed cross-stage tradeoffs. We compared
+whether generalism at the previous stage was related to generalism at
+the current stage, which reduced the dataset by about half. The trends
+followed the pattern expected from life cycle simulations, but only
+weakly, suggesting that there are not obvious tradeoffs between stages.
