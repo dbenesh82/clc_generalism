@@ -30,7 +30,27 @@ dat <- left_join(dat, select(lcdb, Parasite.species, Parasite.group)%>%distinct(
 dat <- mutate(dat, lcl_max_fac = as.character(lcl_max))%>%
   mutate(lcl_max_fac = if_else(lcl_max == "4" | lcl_max == "5", "3+", lcl_max_fac))
 ```
+```{r}
+# worm taxonomy
+acanth_tax <- read.csv("parasite_phylogeny/acanth_taxonomy.csv")
+acanth_tax <- select(acanth_tax, species, genus, family, order, class, phylum)
 
+cest_tax <- read.csv("parasite_phylogeny/cest_taxonomy.csv")
+cest_tax <- select(cest_tax, species, genus, family, order, class, phylum)
+
+nem_tax <- read.csv("parasite_phylogeny/nem_taxonomy_rotl.csv")
+nem_tax <- select(nem_tax, species, genus, family, order, class, phylum)
+
+worm_tax <- rbind(acanth_tax, cest_tax, nem_tax)
+```
+```{r}
+# join worm taxonomy based on genus name
+dat <- mutate(dat, parasite_genus = substr(tree_tips, start = 1, stop = regexpr("_", tree_tips)-1))
+
+dat <- left_join(dat,
+                 select(worm_tax, parasite_genus = genus, parasite_family = family, parasite_order = order, parasite_class = class, parasite_phylum = phylum)%>%distinct(),
+                 by = 'parasite_genus')
+```
 ```{r}
 # make variable to remove species with incomplete life cycle information
 incomplete_lc <- filter(lcdb, Missing.info != 0)%>%
@@ -40,11 +60,19 @@ dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "
               partial_cycle = if_else(Parasite.species %in% incomplete_lc$Parasite.species,
                                            "partial", "complete"))
 ```
-
 ```{r}
 # # run this block to exclude species with partial life cycles! 
 dat <- filter(dat, partial_cycle != "partial")
 tree <- keep.tip(tree, tip = dat$tree_tips)
+```
+```{r}
+# center log-transformed study effort
+dat <- mutate(dat, zstudy_effort =
+                log10(pubs_pubmed_spname_group+1) - mean( log10(pubs_pubmed_spname_group+1), na.rm=T))
+# center at high study effort
+# dat <- mutate(dat, zstudy_effort = 
+#                 log10(pubs_pubmed_spname_group+1) - quantile(log10(pubs_pubmed_spname_group+1), probs = 0.75) )
+dat$obs <- factor(1:length(dat$Parasite.species)) # observation level effect for quantifying overdispersion
 ```
 
 ```{r}
@@ -60,16 +88,13 @@ Number of host records
 sum(dat$num_hosts_lcdb_nhm)
 ```
 
-```{r}
-names(dat)
-```
-
 The first figure: life cycle length vs host range.
 
 ```{r}
 f1a <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
   geom_boxplot(outlier.color = NA) +
-  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), 
+             # color = "tomato1",
              aes(size = pubs_pubmed_spname_group)) +
   scale_y_log10() +
   labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits") +
@@ -89,7 +114,8 @@ tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
 ```{r}
 f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
   geom_boxplot(outlier.color = NA) +
-  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), 
+             # color = "tomato1",
              aes(size = pubs_pubmed_spname_group)) +
   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
   labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index", size = "Pubmed hits") +
@@ -102,19 +128,101 @@ f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
 f1b
 ```
 
-Export as SVG and PNG, first Fig 2a...
+Let's also make the same figure, but with the predicted values from mixed model controlling for study effort and taxonomy.
+
+```{r}
+library(lme4)
+```
+
+```{r}
+regf <- glmer(num_hosts_lcdb_nhm ~ zstudy_effort + lcl_max_fac + 
+                (1|obs) +
+                (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+            data = dat,
+            REML=T,
+            family = 'poisson'
+            )
+```
+
+```{r}
+nd <- select(dat, lcl_max_fac)%>%arrange(lcl_max_fac)%>%distinct()
+nd$zstudy_effort <- 0
+
+nd$preds <- exp(predict(regf, newdata = nd, re.form = NA))
+nd$lcl <- 1:4
+```
+```{r}
+f1a2 <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.15, position = position_jitter(width = 0.3, height = 0),
+             aes(size = pubs_pubmed_spname_group)) +
+  scale_y_log10(breaks = c(1, 5, 10, 25, 50, 100, 250)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits") +
+  guides(size = FALSE) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm)) +
+  geom_line(data = nd, aes(x = lcl, y = preds), 
+            alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
+  geom_point(data = nd, aes(x = lcl, y = preds), 
+            size = 5, shape = 23, color = 'black', fill = 'black')
+
+f1a2
+```
+
+```{r}
+regfx <- lmer(hsi_comb ~ zstudy_effort + lcl_max_fac + 
+                (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+            data = dat,
+            REML=T
+            )
+```
+```{r}
+nd <- select(dat, lcl_max_fac)%>%arrange(lcl_max_fac)%>%distinct()
+nd$zstudy_effort <- 0
+
+nd$preds <- predict(regfx, newdata = nd, re.form = NA)
+nd$lcl <- 1:4
+```
+```{r}
+f1b2 <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.15, position = position_jitter(width = 0.3, height = 0),
+             aes(size = pubs_pubmed_spname_group)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index", size = "Pubmed hits") +
+  theme(legend.position = c(0.98, 0.02),
+        legend.justification = c(1,0),
+        legend.background = element_rect(color = 'black'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb)) +
+  geom_line(data = nd, aes(x = lcl, y = preds), 
+            alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
+  geom_point(data = nd, aes(x = lcl, y = preds), 
+            size = 5, shape = 23, color = 'black', fill = 'black')
+
+f1b2
+```
+
+
+Export the figures with predicted values as SVG and PNG, first Fig 2a...
 
 ```{r}
 fig_width <- 4.5
 fig_height <- 4.5
 
-ggsave(filename = "../figs/Fig2a.svg", plot = f1a, device = 'svg', units = 'in', width = fig_width, height = fig_height)
-ggsave(filename = "../figs/Fig2a.png", plot = f1a, device = 'png', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig2a.svg", plot = f1a2, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig2a.png", plot = f1a2, device = 'png', units = 'in', width = fig_width, height = fig_height)
 ```
 
 ...then Fig 2b.
 
 ```{r}
-ggsave(filename = "../figs/Fig2b.svg", plot = f1b, device = 'svg', units = 'in', width = fig_width, height = fig_height)
-ggsave(filename = "../figs/Fig2b.png", plot = f1b, device = 'png', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig2b.svg", plot = f1b2, device = 'svg', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig2b.png", plot = f1b2, device = 'png', units = 'in', width = fig_width, height = fig_height)
 ```
+
+Combine them in Inkscape.
