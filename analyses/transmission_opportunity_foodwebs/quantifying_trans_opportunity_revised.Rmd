@@ -75,8 +75,8 @@ figsx <- ggplot(filter(chains3_l, hosts != 0, web_study %in% most_relevant_studi
         legend.title = element_text(size = 8),
         strip.text = element_text(size = 6))
 figsx
-ggsave(figsx, filename = "../../figs/FigS7.svg", device = 'svg', width = 6, height = 4)
-ggsave(figsx, filename = "../../figs/FigS7.png", device = 'png', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS5.svg", device = 'svg', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS5.png", device = 'png', width = 6, height = 4)
 rm(figsx)
 ```
 
@@ -220,8 +220,8 @@ f2u <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5)
   facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') +
   guides(fill = FALSE)
 f2u
-ggsave(f2u, filename = "../../figs/FigS9a.png", device = 'png', units = 'in', width = 6, height = 5)
-ggsave(f2u, filename = "../../figs/FigS9a.svg", device = 'svg', units = 'in', width = 6, height = 5)
+ggsave(f2u, filename = "../../figs/FigS7a.png", device = 'png', units = 'in', width = 6, height = 5)
+ggsave(f2u, filename = "../../figs/FigS7a.svg", device = 'svg', units = 'in', width = 6, height = 5)
 ```
 
 ### Taxonomic dissimilarity
@@ -244,8 +244,8 @@ figsx <- ggplot(filter(chains3_l, hosts !=0, web_study %in% most_relevant_studie
         legend.title = element_text(size = 8),
         strip.text = element_text(size = 6))
 figsx
-ggsave(figsx, filename = "../../figs/FigS8.svg", device = 'svg', width = 6, height = 4)
-ggsave(figsx, filename = "../../figs/FigS8.png", device = 'png', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS6.svg", device = 'svg', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS6.png", device = 'png', width = 6, height = 4)
 rm(figsx)
 ```
 
@@ -341,8 +341,8 @@ f2l <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5)
   facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') +
   guides(fill = FALSE)
 f2l
-ggsave(f2l, filename = "../../figs/FigS9b.svg", device = 'svg', units = 'in', width = 6, height = 5)
-ggsave(f2l, filename = "../../figs/FigS9b.png", device = 'png', units = 'in', width = 6, height = 5)
+ggsave(f2l, filename = "../../figs/FigS7b.svg", device = 'svg', units = 'in', width = 6, height = 5)
+ggsave(f2l, filename = "../../figs/FigS7b.png", device = 'png', units = 'in', width = 6, height = 5)
 ```
 
 Then to mirror figure 3, we put the two plots with expectations over observations together and export it.
@@ -362,7 +362,7 @@ laff3 <- gridExtra::grid.arrange(ap[[1]], ap[[2]])
 ```
 
 ```{r}
-ggsave(filename = "../../figs/FigS9.svg", plot = laff3, units = "in", width = 8, height = 8) # bringing the upper plot down still
+ggsave(filename = "../../figs/FigS7.svg", plot = laff3, units = "in", width = 8, height = 8) # bringing the upper plot down still
 ```
 ```{r}
 rm(f2u, f2l, laff3, ap)
@@ -375,14 +375,19 @@ laff1 <- ggplot(filter(chains3_l, hosts != 0, web_study == "Lafferty et al. (200
        aes(x = step_int, y = hosts, color = prop_pot_first_hosts)) +
   geom_line(aes(group = index), alpha = 0.6) +
   labs(x = "Sequential predation events (host in cycle)", y = "Potential hosts", 
-       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
+       color = "Primary\nconsumers\nas first hosts") +
   scale_color_distiller(type = 'div', palette = 'RdBu') +
   scale_x_continuous(breaks = c(1:4)) +
-  theme(panel.grid.minor = element_blank()) +
-  guides(color = FALSE) +
-  annotate(geom = 'text', label = "(b)", x = 4, y = 60)
-
-ggsave(plot = laff1, filename = "Example_web_host_range.png", units = 'in', width = 5, height = 4)
+  theme(panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 9),
+        legend.text = element_text(size = 8),
+        legend.position = c(0.97, 0.97),
+        legend.justification = c(1,1),
+        legend.background = element_rect(color = 'black')) +
+  # guides(color = FALSE) +
+  annotate(geom = 'text', label = "(a)", x = 1.33, y = 60)
+laff1
+# ggsave(plot = laff1, filename = "Example_web_host_range.png", units = 'in', width = 5, height = 4)
 ```
 ```{r}
 # # this many hypothetical parasites in Carp
@@ -398,20 +403,22 @@ laff2 <- ggplot(filter(chains3_l, hosts !=0, web_study == "Lafferty et al. (2006
        aes(x = step_int, y = hsi, color = prop_pot_first_hosts)) +
   geom_line(aes(group = index), alpha = 0.6) +
   labs(x = "Sequential predation events (host in cycle)", y = "Taxonomic dissimilarity index", 
-       color = "Proportion primary\nconsumers\nas first hosts") +
+       color = "Primary\nconsumers\nas first hosts") +
   scale_color_distiller(type = 'div', palette = 'RdBu') +
   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
   scale_x_continuous(limits = c(1,4), breaks = c(1:4)) +
   theme(panel.grid.minor = element_blank(),
-        legend.title = element_text(size = 8),
-        legend.text = element_text(size = 7),
-        legend.position = c(0.5, 0.02),
-        legend.justification = c(0.5,0),
+        legend.title = element_text(size = 9),
+        legend.text = element_text(size = 8),
+        # legend.position = c(0.5, 0.02),
+        # legend.justification = c(0.5,0),
         legend.background = element_rect(color = 'black')) +
-  annotate(geom = 'text', label = "(c)", x = 4, y = max(chains3_l$hsi, na.rm = T))
-
-ggsave(plot = laff2, filename = "Example_web_tax_dissim.png", units = 'in', width = 5, height = 4)
+  guides(color = FALSE) +
+  annotate(geom = 'text', label = "(b)", x = 1.33, y = max(chains3_l$hsi, na.rm = T))
+laff2
+# ggsave(plot = laff2, filename = "Example_web_tax_dissim.png", units = 'in', width = 5, height = 4)
 ```
+
 ```{r}
 laff1 <- laff1 + 
   theme(axis.title.x = element_blank(), 
@@ -423,8 +430,8 @@ laff3 <- gridExtra::grid.arrange(ap[[1]], ap[[2]])
 ```
 
 ```{r}
-# This is Fig 1b and c!
-ggsave(filename = "../../figs/Fig1bc.svg", plot = laff3, units = "in", width = 5, height = 8) # bringing the upper plot down still
+# This is Fig 3a and b!
+ggsave(filename = "../../figs/Fig3ab.svg", plot = laff3, units = "in", width = 5, height = 8) # bringing the upper plot down still
 ```
 ```{r}
 rm(laff1, laff2, laff3, ap)
@@ -449,8 +456,8 @@ figsx <- ggplot(filter(chains3_l, hosts!=0, web_study %in% most_relevant_studies
   labs(x = "Sequential predation events (host in cycle)", y = "Cumulative encountered hosts", 
        color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
 figsx
-ggsave(figsx, filename = "../../figs/FigS4.png", device = 'png', width = 6, height = 4)
-ggsave(figsx, filename = "../../figs/FigS4.svg", device = 'svg', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS2.png", device = 'png', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS2.svg", device = 'svg', width = 6, height = 4)
 rm(figsx)
 ```
 
@@ -597,8 +604,8 @@ f1a <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
         panel.grid.major.x = element_blank()) +
   annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm))
 f1a
-ggsave(f1a, filename = "../../figs/FigS6a.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
-ggsave(f1a, filename = "../../figs/FigS6a.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
+ggsave(f1a, filename = "../../figs/FigS4a.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
+ggsave(f1a, filename = "../../figs/FigS4a.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
 ```
 
 
@@ -619,8 +626,8 @@ figsx <- ggplot(filter(chains3_l, !is.na(hsi), web_study %in% most_relevant_stud
   labs(x = "Sequential predation events (host in cycle)", y = "Cumulative taxonomic dissim index", 
        color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
 figsx
-ggsave(figsx, filename = "../../figs/FigS5.svg", device = 'svg', width = 6, height = 4)
-ggsave(figsx, filename = "../../figs/FigS5.png", device = 'png', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS3.svg", device = 'svg', width = 6, height = 4)
+ggsave(figsx, filename = "../../figs/FigS3.png", device = 'png', width = 6, height = 4)
 rm(figsx)
 ```
 
@@ -712,8 +719,8 @@ f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
         panel.grid.major.x = element_blank()) +
   annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb))
 f1b
-ggsave(f1b, filename = "../../figs/FigS6b.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
-ggsave(f1b, filename = "../../figs/FigS6b.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
+ggsave(f1b, filename = "../../figs/FigS4b.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
+ggsave(f1b, filename = "../../figs/FigS4b.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
 ```
 
 
@@ -774,7 +781,7 @@ s7a <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_host
         panel.grid.minor = element_blank()
         ) 
 s7a
-ggsave(s7a, filename = "../../figs/FigS10a.svg", device = 'svg', height = 4, width = 4)
+ggsave(s7a, filename = "../../figs/FigS8a.svg", device = 'svg', height = 4, width = 4)
 ```
 
 ```{r}
@@ -792,7 +799,7 @@ s7b <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", third_hosts
            y = max(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0)$third_hosts)) +
   guides(color = F)
 s7b
-ggsave(s7b, filename = "../../figs/FigS10b.svg", device = 'svg', height = 4, width = 4)
+ggsave(s7b, filename = "../../figs/FigS8b.svg", device = 'svg', height = 4, width = 4)
 ```
 
 ### Taxonomic dissimilarity
@@ -845,7 +852,7 @@ s7c <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_host
            x = 1, y = 6) +
   guides(color = F)
 s7c
-ggsave(s7c, filename = "../../figs/FigS10c.svg", device = 'svg', height = 4, width = 4)
+ggsave(s7c, filename = "../../figs/FigS8c.svg", device = 'svg', height = 4, width = 4)
 ```
 ```{r}
 s7d <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0),
@@ -861,7 +868,7 @@ s7d <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_host
            x = 1, y = 6) +
   guides(color = F)
 s7d
-ggsave(s7d, filename = "../../figs/FigS10d.svg", device = 'svg', height = 4, width = 4) # combine S7 a to d into one plot
+ggsave(s7d, filename = "../../figs/FigS8d.svg", device = 'svg', height = 4, width = 4) # combine S7 a to d into one plot
 ```
 
 # Conclusions

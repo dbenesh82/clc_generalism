@@ -22,21 +22,21 @@ First, we examined the relationship between generalism and life cycle length at 
 
 Parasites may be generalists at the species level even when specializing at the stage level. We explored how generalism differs across the multiple stages of parasite life cycles; by stage we mean 'host in the life cycle', such as the first intermediate host, second intermediate host, third definitive host, etc. The detailed analysis can be found [here](analyses/stage_level_analyses/stage_level_analysis_host_range_freq.md) for the number of host species and [here](analyses/stage_level_analyses/stage_level_analysis_tax_dissim_freq.md) for the taxonomic dissimilarity index. We found that generalism was higher in the middle stages of long life cycles, such as the second intermediate host.
 
-![](figs/Fig3_comb.png)
+![](figs/Fig4_comb.png)
 
 ## Expected generalism from food webs
 
 Are the trends we see across stages expected? These worms are transmitted trophically, i.e. one host is eaten by the next host, so we derived expectations by simulating parasite life cycles in real food webs. Our goal was see how well encounter-driven life cycles mimicked actual cycles. [These simulations](analyses/transmission_opportunity_foodwebs/quantifying_trans_opportunity_revised.md) recreated at least one notable feature of the data - a peak in generalism after one or two life cycles steps. This can be seen in the next plot, which has expected generalism overlaid on observed generalism; the expectations were color coded by whether a simulated cycle started in many or few of the available first hosts. Simulated cycles usually had higher generalism that observed ones.
 
-![](figs/FigS9.png)
+![](figs/FigS7.png)
 
-our analysis demonstrates how food webs determine potential host ranges and it suggests that realized ranges are smaller and thus presumably shaped by additional things besides just trophic ecology, such as tradeoffs that favor specialization. 
+Our analysis demonstrates how food webs determine potential host ranges and it suggests that realized ranges are smaller and thus presumably shaped by additional things besides just trophic ecology, such as tradeoffs that favor specialization. 
 
 ## Costs of generalism
 
-At the parasite stage level, we assessed tradeoffs between generalism and two life history traits, growth and development time. The analyses are [here](analyses/tradeoffs_w_growth/growth_TO_host_range.md) and [here](analyses/tradeoffs_w_growth/growth_TO_tax_dissim.md) We found that parasite stages that spend less time developing and grow less in their host tended to infect a more taxonomically broad set of hosts. This is consistent with a tradeoff between generalism and parasite growth. 
+At the parasite stage level, we assessed tradeoffs between generalism and two life history traits, growth and development time. The analyses are [here](analyses/tradeoffs_w_growth/growth_TO_host_range.md) and [here](analyses/tradeoffs_w_growth/growth_TO_tax_dissim.md). We found that parasite stages that spend less time developing and grow less in their host tended to infect a more taxonomically broad set of hosts. This is consistent with a tradeoff between generalism and parasite growth. 
 
-![](figs/Fig5_comb.png)
+![](figs/Fig7_comb.png)
 
 # Conclusions
 

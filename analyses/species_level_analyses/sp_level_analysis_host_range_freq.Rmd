@@ -89,8 +89,11 @@ But before fitting a series of models for hypothesis testing, let's try differen
 
 ```{r}
 # center log-transformed study effort
-dat <- mutate(dat, zstudy_effort = 
+dat <- mutate(dat, zstudy_effort =
                 log10(pubs_pubmed_spname_group+1) - mean( log10(pubs_pubmed_spname_group+1), na.rm=T))
+# center at high study effort
+# dat <- mutate(dat, zstudy_effort = 
+#                 log10(pubs_pubmed_spname_group+1) - quantile(log10(pubs_pubmed_spname_group+1), probs = 0.75) )
 dat$obs <- factor(1:length(dat$Parasite.species)) # observation level effect for quantifying overdispersion
 ```
 
@@ -560,7 +563,7 @@ sya <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
   guides(color = FALSE) +
   scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5))
 sya
-ggsave(sya, filename = "../../figs/FigS2a.svg", device = 'svg', width = 4.5, height = 4.5)
+ggsave(sya, filename = "../../figs/FigS9a.svg", device = 'svg', width = 4.5, height = 4.5)
 ```
 
 So to understand what drives the taxonomic effect in the model, let's look at families. We'll take the random effect estimates for parasite family from the model accounting for study effort and life cycle length. Then, we'll sort them to see which families rank high (generalists) or low (specialists). 

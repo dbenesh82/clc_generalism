@@ -1,3 +1,3 @@
 # Species-level generalism
 
-The scripts here were used to [explore](sp_level_exploratory.Rmd) and then analyze two metrics of parasite generalism, [host range](sp_level_analysis_host_range_freq.md) and [host taxonomic dissimilarity](sp_level_analysis_tax_dissim_freq.md). I also compared taxonomic and phylogenetic regressions [here](sp_level_compareTax_Phylo.md).
+The scripts here were used to [explore](sp_level_exploratory.Rmd) and then analyze two metrics of parasite generalism, [host range](sp_level_analysis_host_range_freq.md) and [host taxonomic dissimilarity](sp_level_analysis_tax_dissim_freq.md). I also compared taxonomic and phylogenetic regressions [here](sp_level_compareTax_Phylo.md). Finally, I looked at the relationship between life cycle length and [average generalism per stage](sp_level_gen_tradeoff.md) to test whether generalism per stage decreases with the number of stages, which would imply a ceiling on the total generalism across a life cycle.
