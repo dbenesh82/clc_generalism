@@ -1,7 +1,7 @@
 Species-level regression for taxonomic dissimilarity
 ================
 Dan Benesh
-02/04/2020
+12/06/2020
 
 # Background
 
@@ -184,9 +184,9 @@ opt for the most inclusive (no data subsetting) without transformations.
 As a reminder, I fit the following models: (0) intercept-only, with
 observation-level random effect for residuals, (1) allow taxonomically
 correlated errors, (2) add study effort, (3) add life cycle length
-(max), and (4) add life cycle length (min). In step 3, adding life cycle
-length, I added the term as either a continuous predictor or as a
-factor.
+(max), and (4) add whether cycle is facultative (equivalent to adding
+min life cycle length). In step 3, adding life cycle length, I added the
+term as either a continuous predictor or as a factor.
 
     ## Data: dat
     ## Models:
@@ -203,13 +203,18 @@ factor.
     ## reg3.1:     log10(pubs_pubmed_spname_group + 1) + lcl_max_fac
     ## reg4: hsi_comb ~ (1 | parasite_genus) + (1 | parasite_family) + (1 | 
     ## reg4:     parasite_order) + (1 | parasite_class) + (1 | parasite_phylum) + 
-    ## reg4:     log10(pubs_pubmed_spname_group + 1) + lcl_max_fac + lcl_min
+    ## reg4:     log10(pubs_pubmed_spname_group + 1) + lcl_max_fac + facultative_lc
+    ## reg5: hsi_comb ~ (1 | parasite_genus) + (1 | parasite_family) + (1 | 
+    ## reg5:     parasite_order) + (1 | parasite_class) + (1 | parasite_phylum) + 
+    ## reg5:     log10(pubs_pubmed_spname_group + 1) + lcl_max_fac + facultative_lc + 
+    ## reg5:     lcl_max_fac:facultative_lc
     ##        Df    AIC    BIC   logLik deviance   Chisq Chi Df Pr(>Chisq)    
     ## reg1    7 2078.4 2111.6 -1032.22   2064.4                              
-    ## reg2    8 2080.4 2118.3 -1032.21   2064.4  0.0233      1     0.8786    
-    ## reg3    9 2013.0 2055.7  -997.52   1995.0 69.3724      1     <2e-16 ***
-    ## reg3.1 11 1921.4 1973.5  -949.69   1899.4 95.6676      2     <2e-16 ***
-    ## reg4   12 1922.6 1979.4  -949.28   1898.6  0.8049      1     0.3696    
+    ## reg2    8 2080.4 2118.3 -1032.21   2064.4  0.0233      1    0.87863    
+    ## reg3    9 2013.0 2055.7  -997.52   1995.0 69.3724      1    < 2e-16 ***
+    ## reg3.1 11 1921.4 1973.5  -949.69   1899.4 95.6676      2    < 2e-16 ***
+    ## reg4   12 1922.5 1979.4  -949.27   1898.5  0.8244      1    0.36390    
+    ## reg5   13 1921.7 1983.2  -947.84   1895.7  2.8582      1    0.09091 .  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -265,14 +270,15 @@ Here’s the summary of the “best” model
 Now let’s look explicitly at effect sizes by making an R<sup>2</sup>
 table.
 
-    ## # A tibble: 5 x 5
+    ## # A tibble: 6 x 5
     ##   step                      df_used marg_r2 cond_r2 tax_var_explained
     ##   <chr>                       <dbl>   <dbl>   <dbl>             <dbl>
     ## 1 taxonomy                       NA   0       0.598             0.598
     ## 2 study effort                    1   0       0.599             0.599
     ## 3 life cycle length               1   0.129   0.516             0.387
     ## 4 life cycle length, factor       2   0.379   0.543             0.164
-    ## 5 facultative life cycle          1   0.383   0.543             0.16
+    ## 5 facultative life cycle          1   0.383   0.543             0.16 
+    ## 6 facultative x lcl               1   0.39    0.548             0.158
 
 The most important factor is life cycle length - as a factor it explains
 38% of the variation. Even after accounting for this, there is still an

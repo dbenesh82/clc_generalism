@@ -136,6 +136,8 @@ A similar pattern is seen for taxonomic dissimilarity.
 
 ![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
 There are a number of species in the database that infect paratenic
 hosts. In paratenic hosts, it is usually assumed that the parasite
 undergoes little to no growth. Consequently, their size in paratenic
@@ -155,14 +157,16 @@ sizes compared to only 20% of obligate stages.
 In those cases where size was reported, growth in paratenic hosts is
 lower than in obligate hosts.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 Therefore, for any paratenic host stage without growth data, I set the
 growth to zero and then replotted the data. This makes the negative
 relationship clearer, especially for worms in intermediate hosts (since
 those are the paratenic hosts).
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 It looks like specificity and growth are linked. Parasites grow less
 when they are more generalist at a given stage. What about developmental
@@ -171,9 +175,10 @@ time? Is there a tradeoff between generalism and development?
 It does not look like it. Stages with long development times are as
 generalist as those with short development times.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
 
 In paratenic hosts, parasites are assumed to undergo no development.
 This was implicitly assumed in many papers used to construct the life
@@ -182,12 +187,13 @@ a day at room temperature to become infective to the next host. When we
 replot the data, we see that these species in paratenic hosts (left
 side) tend to have higher generalism.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
 
 Here’s another way to look at it. Parasites are generalists when
 infecting paratenic intermediate hosts.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
 
 Instead of looking at growth and development separately, we can also
 look at them together, namely as a growth rate (relative size increase
@@ -195,7 +201,7 @@ per unit time). There is not a clear relationship between growth rate
 and host generalism, suggesting generalists do not grow slower than
 specialists (though they grow less).
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
 
 ## Break variables by life cycle stage
 
@@ -203,14 +209,14 @@ We can break this down further by looking at how our variables of
 interest vary across life cycles of different lengths. This plot shows
 how the middle hosts in long life cycles tend to have higher generalism.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
 
 Here are the development times in degree days across the life cycle.
 Development times are often higher in definitive hosts, which is
 probably because many of these hosts are endotherms (high temperature,
 many degree days).
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
 
 Note above that the middle hosts (second, third intermediate hosts) in
 long life cycles exhibit long development. This pattern can be changed
@@ -219,23 +225,23 @@ in paratenic hosts. Under this assumption, we see that second and third
 intermediate hosts, those most likely to be paratenic hosts, actually
 have the shortest developmental times.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-35-1.png)<!-- -->
 
 Let’s next look at how growth, in absolute terms, varies across life
 cycles. It is usually highest in definitive hosts, again because worms
 tend to enter definitive hosts large, double in size a few times, and
 then stop growing.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-36-1.png)<!-- -->
 
 When we look at relative growth, it is rather comparable across stages.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
 
 However, if we assume that worms do not grow in paratenic hosts, we see
 that growth is especially low in second and third intermediate hosts.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
 
 # Within-species correlations
 
@@ -250,7 +256,7 @@ In complex life cycle worms, generalism in the first and second host is
 uncorrelated (if anything it is positively correlated), which is not
 consistent with a tradeoff.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-42-1.png)<!-- -->
 
 #### Growth
 
@@ -261,17 +267,17 @@ also grow large in the second host. Presumably, size is just compounding
 itself across hosts - large worms can more easily accumulate additional
 mass in absolute terms.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
 
 However, it relative terms, more growth in the first host leaves less
 opportunity for large increases in growth in the next host - there is a
 negative relationship between relative growth across hosts.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-43-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-47-1.png)<!-- -->
 
 #### Devo times
 
 There are not many examples of development times being recorded across
 multiple stages of a parasite life cycle. Still, no pattern is apparent.
 
-![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
+![](growth_TO_exploratory_plots_files/figure-gfm/unnamed-chunk-49-1.png)<!-- -->

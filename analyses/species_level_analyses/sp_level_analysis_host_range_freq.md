@@ -1,7 +1,7 @@
 Species-level regression for host range
 ================
 Dan Benesh
-02/04/2020
+12/06/2020
 
 # Background
 
@@ -74,20 +74,20 @@ matching the predictions. However, this relationship could be obscured
 by a few high values, so we’ll log-transform the axes. Note that the
 standard LMM model predicts negative values, which does not make sense.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
 After log-transformation, we see that the Poisson model still seems to
 perform best. All the models have trouble predicting low generalism
 values, probably because there are an excess of ones or twos in the data
 (just one or two known hosts in poorly studied species).
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 Next, let’s look at the unstandardized residual plots. Again the Poisson
 model seems to do best, as it has the most homogenous scatter around
 zero.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 Another way to check model fit is to compare the distribution of
 predictions with that of the observations. Here are density plots for
@@ -95,7 +95,7 @@ the predicted values. We can see that some models yield predictions more
 closely matching the data than others, but it is a little hard to tell
 with the substantial right-skew in the data.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 The differences may be easier to see on a log-scale. The LMM peaks at
 values that are too high, while the neg binomial and log-transformed LMM
@@ -103,7 +103,7 @@ are both probably overconfident with too narrow a distribution. The
 Poisson model appears best, though as stated before, seems to
 overestimate low values.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 The main trend of interest is the increase in host range with life cycle
 length. Let’s see what the models predict for this relationship,
@@ -116,7 +116,7 @@ match with the observed values for the Poisson model. Other models
 underestimate the variance (LMM) or do not match the medians well
 (negative binomial regression).
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 As a final model check, let’s look at the distribution of random
 effects. Random effects are assumed to be normally distributed. We’ll
@@ -128,13 +128,13 @@ family level. The family effects in all models seem to have a slight
 positive skew. All these distributions appear ok, with the exception of
 the standard LMM.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 Here is the density plot for the random genus effects. Again, the LMM
 seems to stand out as poor, while the largest effects are seem for the
 Poisson model.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 The Poisson model seems to be best, as its predictions best approximate
 the observed data. A final consideration for Poisson models is
@@ -227,7 +227,7 @@ though, that observation-level random effects might not work well with
 zero-inflation (see [here](https://peerj.com/articles/616/)), which
 applies to this case (i.e. many parasites with low host ranges).
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
 
 Moving on to hypothesis testing, let’s include the observation-level
 random effect in our model, but keep in mind that we might want to look
@@ -238,12 +238,12 @@ at models without this effect as well.
 As a reminder, I fit the following models: (0) intercept-only, with
 observation-level random effect for residuals, (1) allow taxonomically
 correlated errors, (2) add study effort, (3) add life cycle length
-(max), and (4) add life cycle length (min). In step 3, adding life cycle
-length, I added the term as either a continuous predictor or as a
-factor. By adding it as a factor, I am looking for evidence of
-non-linearity, e.g. the difference between one- and two-host cycle
-parasites is not the same as the difference between two- and three-host
-cycle parasites.
+(max), and (4) add facultative life cycle (equivalent to adding min life
+cycle length). In step 3, adding life cycle length, I added the term as
+either a continuous predictor or as a factor. By adding it as a factor,
+I am looking for evidence of non-linearity, e.g. the difference between
+one- and two-host cycle parasites is not the same as the difference
+between two- and three-host cycle parasites.
 
     ## Data: dat
     ## Models:
@@ -261,20 +261,25 @@ cycle parasites.
     ## reg3.1f:     (1 | parasite_phylum) + zstudy_effort + lcl_max_fac
     ## reg4f: num_hosts_lcdb_nhm ~ (1 | obs) + (1 | parasite_genus) + (1 | 
     ## reg4f:     parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
-    ## reg4f:     (1 | parasite_phylum) + zstudy_effort + lcl_max_fac + lcl_min
+    ## reg4f:     (1 | parasite_phylum) + zstudy_effort + lcl_max_fac + facultative_lc
+    ## reg5f: num_hosts_lcdb_nhm ~ (1 | obs) + (1 | parasite_genus) + (1 | 
+    ## reg5f:     parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg5f:     (1 | parasite_phylum) + zstudy_effort + lcl_max_fac + facultative_lc + 
+    ## reg5f:     lcl_max_fac:facultative_lc
     ##         Df    AIC    BIC  logLik deviance    Chisq Chi Df Pr(>Chisq)    
     ## reg1f    7 6626.1 6659.2 -3306.0   6612.1                               
     ## reg2f    8 6270.0 6307.9 -3127.0   6254.0 358.1003      1  < 2.2e-16 ***
     ## reg3f    9 6153.3 6195.9 -3067.7   6135.3 118.6655      1  < 2.2e-16 ***
     ## reg3.1f 11 6146.1 6198.2 -3062.0   6124.1  11.2518      2   0.003603 ** 
-    ## reg4f   12 6147.0 6203.8 -3061.5   6123.0   1.0643      1   0.302226    
+    ## reg4f   12 6147.7 6204.5 -3061.8   6123.7   0.4005      1   0.526836    
+    ## reg5f   13 6148.9 6210.5 -3061.4   6122.9   0.7749      1   0.378700    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 These models are nested, so we can compare them with likelihood ratio
 tests (table above). All model terms added are an improvement, except
-the minimum life cycle length variable. The best model as judged by AIC
-is the one treating life cycle length as a categorical variable.
+the facultative life cycle terms. The best model as judged by AIC is the
+one treating life cycle length as a categorical variable.
 
 The estimated slope for life cycle length was 0.682, which corresponds
 to a percent change of 97.87% total hosts per additional transmission
@@ -340,7 +345,7 @@ Here’s the summary of the “best” model
 Now let’s look explicitly at effect sizes by making an R<sup>2</sup>
 table.
 
-    ## # A tibble: 5 x 5
+    ## # A tibble: 6 x 5
     ##   step                      df_used marg_r2 cond_r2 tax_var_explained
     ##   <chr>                       <dbl>   <dbl>   <dbl>             <dbl>
     ## 1 taxonomy                       NA   0       0.307             0.307
@@ -348,6 +353,7 @@ table.
     ## 3 life cycle length               1   0.451   0.570             0.119
     ## 4 life cycle length, factor       2   0.453   0.565             0.112
     ## 5 facultative life cycle          1   0.453   0.564             0.111
+    ## 6 facultative x lcl               1   0.451   0.564             0.113
 
 The R<sup>2</sup> table suggests that even after accounting for life
 cycle length, there is still an effect of taxonomy, explaining about 11%
@@ -355,7 +361,7 @@ of the variation. Let’s examine this a little more closely. At what
 level is the variation? The parasite genus or family tends to be most
 ‘explanatory’.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
 
 This suggests parasite genera and families exhibit different levels of
 generalism, while at higher taxonomic levels this variance gets averaged
@@ -389,7 +395,7 @@ happen towards the tips with families and genera.
 
 Here is the same information, but plotted.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
 
 So to understand what drives the taxonomic effect in the model, let’s
 look at families. We’ll take the random effect estimates for parasite
@@ -446,13 +452,13 @@ specialists with few hosts and high study efforts. Also, the variability
 is a reminder that taxonomy only explained 10% of the variation in
 generalism in the final model.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-42-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-43-1.png)<!-- -->
 
 The patterns are clearer when we have boxplots for each family, but even
 here the differences between generalist and specialist families are not
 extremely pronounced.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-43-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-44-1.png)<!-- -->
 
 Not all specialist families (bottom 10%) have more restricted host
 ranges than generalist families (top 10%). Rather than looking at raw
@@ -461,12 +467,12 @@ values, perhaps we can compare the median predicted value for a family
 range. That is the next plot, and it demonstrates how many more hosts
 some families exhibit, on average, compared to expectations.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-46-1.png)<!-- -->
 
 Here’s a similar plot, but for all families, ordered by the observed
 host range.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-46-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-47-1.png)<!-- -->
 
 Finally, I checked whether the random effect estimates are influenced by
 the other taxonomic variables. I re-fit the model with only parasite
@@ -475,7 +481,7 @@ to those from the full model. They are quite well correlated, suggesting
 family-level generalism is estimated similarly, regardless of whether
 other taxonomic levels are included in the model.
 
-![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-47-1.png)<!-- -->
+![](sp_level_analysis_host_range_freq_files/figure-gfm/unnamed-chunk-48-1.png)<!-- -->
 
 # Conclusions
 

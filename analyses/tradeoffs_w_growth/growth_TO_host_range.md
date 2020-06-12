@@ -260,10 +260,172 @@ negative, but it is weaker and not significant.
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-#### Development time
+#### Development time - days
 
-Moving on to development time. Short development times were associated
-with higher generalism, which is consistent with a tradeoff.
+Moving on to development time expressed as days to maturity. There is
+not a clear relationship between host range and developmental time.
+
+    ## Data: filter(st_level, !is.na(avg_dt))
+    ## Models:
+    ## reg00: num_hosts_suspicious_removed ~ 1 + (1 | obs) + (1 | Parasite.species)
+    ## reg0: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg0:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg0:     (1 | parasite_class) + (1 | parasite_phylum)
+    ## reg1: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg1:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg1:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort
+    ## reg2: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg2:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg2:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg2:     log10(avg_dt)
+    ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
+    ## reg00  3 4119.0 4133.1 -2056.5   4113.0                              
+    ## reg0   8 4110.5 4148.2 -2047.2   4094.5 18.4970      5   0.002384 ** 
+    ## reg1   9 4046.9 4089.3 -2014.5   4028.9 65.5607      1  5.635e-16 ***
+    ## reg2  10 4048.4 4095.4 -2014.2   4028.4  0.5573      1   0.455367    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Here’s the model output.
+
+    ## Generalized linear mixed model fit by maximum likelihood (Laplace
+    ##   Approximation) [glmerMod]
+    ##  Family: poisson  ( log )
+    ## Formula: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) +  
+    ##     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) +  
+    ##     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort +  
+    ##     log10(avg_dt)
+    ##    Data: filter(st_level, !is.na(avg_dt))
+    ## 
+    ##      AIC      BIC   logLik deviance df.resid 
+    ##   4048.4   4095.4  -2014.2   4028.4      807 
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.3155 -0.5459 -0.1294  0.3078  1.0687 
+    ## 
+    ## Random effects:
+    ##  Groups           Name        Variance  Std.Dev. 
+    ##  obs              (Intercept) 3.799e-01 0.6163770
+    ##  Parasite.species (Intercept) 1.594e-05 0.0039925
+    ##  parasite_genus   (Intercept) 3.084e-02 0.1756062
+    ##  parasite_family  (Intercept) 8.554e-02 0.2924678
+    ##  parasite_order   (Intercept) 1.588e-03 0.0398452
+    ##  parasite_class   (Intercept) 6.787e-07 0.0008238
+    ##  parasite_phylum  (Intercept) 3.777e-07 0.0006146
+    ## Number of obs: 817, groups:  
+    ## obs, 817; Parasite.species, 609; parasite_genus, 293; parasite_family, 100; parasite_order, 26; parasite_class, 6; parasite_phylum, 3
+    ## 
+    ## Fixed effects:
+    ##               Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept)    1.18187    0.15619   7.567 3.83e-14 ***
+    ## zstudy_effort  0.34265    0.04291   7.986 1.39e-15 ***
+    ## log10(avg_dt) -0.06789    0.09396  -0.723     0.47    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Correlation of Fixed Effects:
+    ##             (Intr) zstdy_
+    ## zstudy_ffrt -0.085       
+    ## lg10(vg_dt) -0.882 -0.101
+    ## convergence code: 0
+    ## Model failed to converge with max|grad| = 0.0493249 (tol = 0.001, component 1)
+
+Little variation was explained by development time.
+
+    ## # A tibble: 4 x 5
+    ##   step                df_used marg_r2 cond_r2 rand_var_explained
+    ##   <chr>                 <dbl>   <dbl>   <dbl>              <dbl>
+    ## 1 within-species corr      NA   0       0.143              0.143
+    ## 2 taxonomy                  0   0       0.17               0.17 
+    ## 3 study effort              1   0.092   0.232              0.14 
+    ## 4 devo time                 1   0.093   0.232              0.139
+
+If we assume development in paratenic hosts is short (1 day), then the
+relationship is significant.
+
+    ## Data: filter(st_level, !is.na(avg_dt_paratenic))
+    ## Models:
+    ## reg00: num_hosts_suspicious_removed ~ 1 + (1 | obs) + (1 | Parasite.species)
+    ## reg0: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg0:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg0:     (1 | parasite_class) + (1 | parasite_phylum)
+    ## reg1: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg1:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg1:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort
+    ## reg2: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg2:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg2:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg2:     log10(avg_dt_paratenic)
+    ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
+    ## reg00  3 5067.3 5082.0 -2530.7   5061.3                              
+    ## reg0   8 5040.0 5079.1 -2512.0   5024.0 37.3615      5  5.069e-07 ***
+    ## reg1   9 4960.9 5004.9 -2471.4   4942.9 81.0842      1  < 2.2e-16 ***
+    ## reg2  10 4956.9 5005.8 -2468.5   4936.9  5.9754      1    0.01451 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Here’s the model output.
+
+    ## Generalized linear mixed model fit by maximum likelihood (Laplace
+    ##   Approximation) [glmerMod]
+    ##  Family: poisson  ( log )
+    ## Formula: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) +  
+    ##     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) +  
+    ##     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort +  
+    ##     log10(avg_dt_paratenic)
+    ##    Data: filter(st_level, !is.na(avg_dt_paratenic))
+    ## 
+    ##      AIC      BIC   logLik deviance df.resid 
+    ##   4956.9   5005.8  -2468.5   4936.9      968 
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.3202 -0.5358 -0.1213  0.2954  1.0866 
+    ## 
+    ## Random effects:
+    ##  Groups           Name        Variance  Std.Dev. 
+    ##  obs              (Intercept) 3.910e-01 6.253e-01
+    ##  Parasite.species (Intercept) 1.713e-06 1.309e-03
+    ##  parasite_genus   (Intercept) 3.281e-02 1.811e-01
+    ##  parasite_family  (Intercept) 8.814e-02 2.969e-01
+    ##  parasite_order   (Intercept) 5.288e-03 7.272e-02
+    ##  parasite_class   (Intercept) 0.000e+00 0.000e+00
+    ##  parasite_phylum  (Intercept) 7.853e-09 8.862e-05
+    ## Number of obs: 978, groups:  
+    ## obs, 978; Parasite.species, 656; parasite_genus, 307; parasite_family, 102; parasite_order, 26; parasite_class, 6; parasite_phylum, 3
+    ## 
+    ## Fixed effects:
+    ##                         Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept)              1.24910    0.08972  13.922   <2e-16 ***
+    ## zstudy_effort            0.36907    0.03888   9.492   <2e-16 ***
+    ## log10(avg_dt_paratenic) -0.11861    0.04792  -2.475   0.0133 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Correlation of Fixed Effects:
+    ##             (Intr) zstdy_
+    ## zstudy_ffrt -0.224       
+    ## lg10(vg_d_) -0.692  0.024
+    ## convergence code: 0
+    ## boundary (singular) fit: see ?isSingular
+
+The effect size is still small, though, explaining less than 1% of the
+variation.
+
+    ## # A tibble: 4 x 5
+    ##   step                df_used marg_r2 cond_r2 rand_var_explained
+    ##   <chr>                 <dbl>   <dbl>   <dbl>              <dbl>
+    ## 1 within-species corr      NA   0       0.222              0.222
+    ## 2 taxonomy                  0   0       0.247              0.247
+    ## 3 study effort              1   0.104   0.265              0.161
+    ## 4 devo time                 1   0.108   0.253              0.145
+
+#### Development time - degree days
+
+Moving on to development time expressed in temp-corrected degree days.
+Short development times were associated with higher generalism, which is
+consistent with a tradeoff.
 
     ## Data: filter(st_level, !is.na(avg_dd))
     ## Models:
@@ -340,7 +502,7 @@ development time.
     ## 1 within-species corr      NA   0       0.132              0.132
     ## 2 taxonomy                  0   0       0.143              0.143
     ## 3 study effort              1   0.093   0.211              0.118
-    ## 4 growth                    1   0.096   0.209              0.113
+    ## 4 devo time                 1   0.096   0.209              0.113
 
 If we assume development in paratenic hosts is short (1 day), then the
 relationship is much stronger.
@@ -420,17 +582,24 @@ variation.
     ## 1 within-species corr      NA   0       0.222              0.222
     ## 2 taxonomy                  0   0       0.234              0.234
     ## 3 study effort              1   0.105   0.257              0.152
-    ## 4 growth                    1   0.113   0.237              0.124
+    ## 4 devo time                 1   0.113   0.237              0.124
 
 #### Relative growth rate
 
 Now, we look at growth rate, which combines the effects of growth and
 development. It is important to keep in mind that the sample size is
 smaller when considering development and growth simultaneously (some
-stages with growth data lack development data and vice versa). Adding
-relative growth rate weakly improves the model.
+stages with growth data lack development data and vice versa). There are
+different ways of measuring growth rate. Here I use this formula for
+relative growth rate (rgr): (ln end size - ln starting size) / time. For
+modeling, it does not matter if we use log10 or ln, because the
+resulting rgrs are perfectly correlated. Interpretation of rgr is easier
+with natural logs, though, as it approximates the exponential growth
+rate (i.e. the % change per unit time), but only for lower growth rates.
 
-    ## Data: filter(st_level, !is.na(rel_growth_rate_dd))
+Adding relative growth rate weakly improves the model.
+
+    ## Data: filter(st_level, !is.na(rg_dd))
     ## Models:
     ## reg00: num_hosts_suspicious_removed ~ 1 + (1 | obs) + (1 | Parasite.species)
     ## reg0: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
@@ -442,12 +611,12 @@ relative growth rate weakly improves the model.
     ## reg2: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
     ## reg2:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
     ## reg2:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
-    ## reg2:     rel_growth_rate_dd
+    ## reg2:     rg_dd
     ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
     ## reg00  3 2560.1 2572.8 -1277.1   2554.1                              
     ## reg0   8 2557.6 2591.2 -1270.8   2541.6 12.5831      5    0.02762 *  
     ## reg1   9 2502.6 2540.4 -1242.3   2484.6 56.9940      1  4.371e-14 ***
-    ## reg2  10 2500.2 2542.2 -1240.1   2480.2  4.3886      1    0.03618 *  
+    ## reg2  10 2500.1 2542.1 -1240.0   2480.1  4.5079      1    0.03374 *  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -459,43 +628,42 @@ with more generalism, which is not what we would expect.
     ##  Family: poisson  ( log )
     ## Formula: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) +  
     ##     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) +  
-    ##     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort +  
-    ##     rel_growth_rate_dd
-    ##    Data: filter(st_level, !is.na(rel_growth_rate_dd))
+    ##     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort +      rg_dd
+    ##    Data: filter(st_level, !is.na(rg_dd))
     ## 
     ##      AIC      BIC   logLik deviance df.resid 
-    ##   2500.2   2542.2  -1240.1   2480.2      484 
+    ##   2500.1   2542.1  -1240.0   2480.1      484 
     ## 
     ## Scaled residuals: 
     ##     Min      1Q  Median      3Q     Max 
-    ## -1.3672 -0.5284 -0.1179  0.2967  0.9611 
+    ## -1.3623 -0.5252 -0.1187  0.3014  0.9716 
     ## 
     ## Random effects:
-    ##  Groups           Name        Variance  Std.Dev.
-    ##  obs              (Intercept) 3.978e-01 0.630721
-    ##  Parasite.species (Intercept) 5.336e-04 0.023099
-    ##  parasite_genus   (Intercept) 2.990e-02 0.172917
-    ##  parasite_family  (Intercept) 8.721e-02 0.295306
-    ##  parasite_order   (Intercept) 1.711e-06 0.001308
-    ##  parasite_class   (Intercept) 3.101e-05 0.005569
-    ##  parasite_phylum  (Intercept) 2.925e-05 0.005408
+    ##  Groups           Name        Variance  Std.Dev. 
+    ##  obs              (Intercept) 3.943e-01 6.279e-01
+    ##  Parasite.species (Intercept) 3.770e-08 1.942e-04
+    ##  parasite_genus   (Intercept) 3.563e-02 1.887e-01
+    ##  parasite_family  (Intercept) 7.750e-02 2.784e-01
+    ##  parasite_order   (Intercept) 5.778e-09 7.601e-05
+    ##  parasite_class   (Intercept) 1.919e-08 1.385e-04
+    ##  parasite_phylum  (Intercept) 4.212e-09 6.490e-05
     ## Number of obs: 494, groups:  
     ## obs, 494; Parasite.species, 390; parasite_genus, 227; parasite_family, 89; parasite_order, 23; parasite_class, 6; parasite_phylum, 3
     ## 
     ## Fixed effects:
-    ##                    Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept)         1.00204    0.08223  12.186  < 2e-16 ***
-    ## zstudy_effort       0.41669    0.05330   7.817 5.41e-15 ***
-    ## rel_growth_rate_dd 30.79486   14.08531   2.186   0.0288 *  
+    ##               Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept)    1.00843    0.08091  12.464  < 2e-16 ***
+    ## zstudy_effort  0.41216    0.05301   7.775 7.53e-15 ***
+    ## rg_dd         12.94283    6.05151   2.139   0.0325 *  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
     ## Correlation of Fixed Effects:
     ##             (Intr) zstdy_
-    ## zstudy_ffrt -0.210       
-    ## rl_grwth_r_ -0.649 -0.028
+    ## zstudy_ffrt -0.211       
+    ## rg_dd       -0.653 -0.026
     ## convergence code: 0
-    ## Model failed to converge with max|grad| = 0.307358 (tol = 0.001, component 1)
+    ## boundary (singular) fit: see ?isSingular
 
 The variance explained is still less than 1%.
 
@@ -505,7 +673,7 @@ The variance explained is still less than 1%.
     ## 1 within-species corr      NA   0       0.194              0.194
     ## 2 taxonomy                  0   0       0.218              0.218
     ## 3 study effort              1   0.126   0.258              0.132
-    ## 4 growth                    1   0.132   0.264              0.132
+    ## 4 growth rate               1   0.131   0.259              0.128
 
 What about if we include paratenic hosts in the analysis with relative
 growth rates? This does not necessarily make sense, because we assumed
@@ -542,7 +710,7 @@ But this term still does not explain much variation.
     ## 1 within-species corr      NA   0       0.243              0.243
     ## 2 taxonomy                  0   0       0.255              0.255
     ## 3 study effort              1   0.131   0.258              0.127
-    ## 4 growth                    1   0.137   0.271              0.134
+    ## 4 growth rate               1   0.137   0.271              0.134
 
 ### Case 2
 
@@ -626,10 +794,80 @@ explain that imputed variation.
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
-#### Development time
+#### Development time - days
 
-On the other hand, adding development time to a model with life cycle
-characteristics is a slight improvement.
+Adding development time in days to a model with life cycle
+characteristics is not an improvement.
+
+    ## Data: filter(st_level, !is.na(avg_dt))
+    ## Models:
+    ## reg00: num_hosts_suspicious_removed ~ 1 + (1 | obs) + (1 | Parasite.species)
+    ## reg0: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg0:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg0:     (1 | parasite_class) + (1 | parasite_phylum)
+    ## reg1: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg1:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg1:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort
+    ## reg4: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg4:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg4:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg4:     Def.int + Host_no_fac + Def.int:Host_no_fac
+    ## reg5: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg5:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg5:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg5:     Def.int + Host_no_fac + log10(avg_dt) + Def.int:Host_no_fac
+    ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
+    ## reg00  3 4119.0 4133.1 -2056.5   4113.0                              
+    ## reg0   8 4110.5 4148.2 -2047.2   4094.5 18.4970      5   0.002384 ** 
+    ## reg1   9 4046.9 4089.3 -2014.5   4028.9 65.5607      1  5.635e-16 ***
+    ## reg4  15 4013.6 4084.2 -1991.8   3983.6 45.3401      6  4.006e-08 ***
+    ## reg5  16 4015.2 4090.5 -1991.6   3983.2  0.4386      1   0.507775    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+    ## # A tibble: 7 x 5
+    ##   step                df_used marg_r2 cond_r2 rand_var_explained
+    ##   <chr>                 <dbl>   <dbl>   <dbl>              <dbl>
+    ## 1 within-species corr      NA   0       0.143             0.143 
+    ## 2 taxonomy                  0   0       0.17              0.17  
+    ## 3 study effort              1   0.092   0.232             0.14  
+    ## 4 stage function            1   0.095   0.23              0.135 
+    ## 5 host number               3   0.138   0.222             0.0840
+    ## 6 host x stage              2   0.14    0.227             0.087 
+    ## 7 devo                      1   0.141   0.225             0.084
+
+When we assume development does not occur in paratenic hosts, the
+results are similar. Developmental time does not explain additional
+variation in host range beyond that explained by the life cycle.
+
+    ## Data: filter(st_level, !is.na(avg_dt_paratenic))
+    ## Models:
+    ## reg0: num_hosts_suspicious_removed ~ 1 + (1 | obs) + (1 | Parasite.species) + 
+    ## reg0:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg0:     (1 | parasite_class) + (1 | parasite_phylum)
+    ## reg1: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg1:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg1:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort
+    ## reg4: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg4:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg4:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg4:     Def.int + Host_no_fac + Def.int:Host_no_fac
+    ## reg5: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
+    ## reg5:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
+    ## reg5:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
+    ## reg5:     Def.int + Host_no_fac + log10(avg_dt_paratenic) + Def.int:Host_no_fac
+    ##      Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
+    ## reg0  8 5040.0 5079.1 -2512.0   5024.0                              
+    ## reg1  9 4960.9 5004.9 -2471.4   4942.9 81.0842      1  < 2.2e-16 ***
+    ## reg4 16 4922.6 5000.7 -2445.3   4890.6 52.3375      7  5.009e-09 ***
+    ## reg5 17 4924.5 5007.6 -2445.2   4890.5  0.0583      1     0.8092    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+#### Development time - degree days
+
+On the other hand, adding development time in degree days to a model
+with life cycle characteristics is a marginal improvement.
 
     ## Data: filter(st_level, !is.na(avg_dd))
     ## Models:
@@ -657,6 +895,8 @@ characteristics is a slight improvement.
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
+But it explained little variation in host range.
+
     ## # A tibble: 7 x 5
     ##   step                df_used marg_r2 cond_r2 rand_var_explained
     ##   <chr>                 <dbl>   <dbl>   <dbl>              <dbl>
@@ -671,8 +911,8 @@ characteristics is a slight improvement.
 When we assume development does not occur in paratenic hosts, the
 results change slightly. Specifically, life cycle characteristics become
 more important, i.e. being a second or third intermediate hosts, but
-developmental time still does not explain additional variation beyond
-that explained by the life cycle.
+developmental time still does not explain additional variation in host
+range beyond that explained by the life cycle.
 
     ## Data: filter(st_level, !is.na(avg_dd_paratenic))
     ## Models:
@@ -703,7 +943,7 @@ that explained by the life cycle.
 Again, the relation between relative growth rate and host range is
 marginal, but not in the expected direction.
 
-    ## Data: filter(st_level, !is.na(rel_growth_rate_dd))
+    ## Data: filter(st_level, !is.na(rg_dd))
     ## Models:
     ## reg00: num_hosts_suspicious_removed ~ 1 + (1 | obs) + (1 | Parasite.species)
     ## reg0: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
@@ -719,15 +959,18 @@ marginal, but not in the expected direction.
     ## reg5: num_hosts_suspicious_removed ~ (1 | obs) + (1 | Parasite.species) + 
     ## reg5:     (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
     ## reg5:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
-    ## reg5:     Def.int + Host_no_fac + rel_growth_rate_dd + Def.int:Host_no_fac
+    ## reg5:     Def.int + Host_no_fac + rg_dd + Def.int:Host_no_fac
     ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
     ## reg00  3 2560.1 2572.8 -1277.1   2554.1                              
     ## reg0   8 2557.6 2591.2 -1270.8   2541.6 12.5831      5    0.02762 *  
     ## reg1   9 2502.6 2540.4 -1242.3   2484.6 56.9940      1  4.371e-14 ***
     ## reg4  14 2486.6 2545.4 -1229.3   2458.6 25.9770      5  9.016e-05 ***
-    ## reg5  15 2483.2 2546.2 -1226.6   2453.2  5.4349      1    0.01974 *  
+    ## reg5  15 2483.2 2546.2 -1226.6   2453.2  5.4332      1    0.01976 *  
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+The effect of relative growth rate is weak, explaining \<1% of the
+variation
 
     ## # A tibble: 7 x 5
     ##   step                df_used marg_r2 cond_r2 rand_var_explained
@@ -738,11 +981,11 @@ marginal, but not in the expected direction.
     ## 4 stage function            1   0.128   0.261             0.133 
     ## 5 host number               3   0.17    0.236             0.0660
     ## 6 host x stage              1   0.17    0.241             0.0710
-    ## 7 rel growth rate           1   0.179   0.246             0.067
+    ## 7 rel growth rate           1   0.178   0.245             0.067
 
-Check whether this changes after imputing data for paratenic stages. The
-effect of parasite growth rate is marginally significant. Stage info
-must explain that imputed variation.
+The marginally significant effect of growth rate remains after imputing
+data for paratenic stages, though it is debatable whether this makes
+sense, since imputed growth rates are usually zero.
 
     ## Data: filter(st_level, !is.na(rel_growth_rate_paratenic))
     ## Models:

@@ -185,8 +185,116 @@ hosts, in fact the effect size is quite a bit larger.
     ## 3 study effort          1   0.053   0.233              0.18                0    
     ## 4 devo                  1   0.115   0.267              0.152               0
 
-#### Development time
+#### Developmental time - days
 
+Now let’s fit the same models, but using the simplest metric for
+developmental time, days. The addition of devo time, without imputation
+in paratenic hosts is marginally significant.
+
+    ## Data: filter(st_level, !is.na(avg_dt))
+    ## Models:
+    ## reg00: hsi_lcdb_suspcious_rem ~ 1 + (1 | Parasite.species)
+    ## reg0: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg0:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg0:     (1 | parasite_phylum)
+    ## reg1: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg1:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg1:     (1 | parasite_phylum) + zstudy_effort
+    ## reg2: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg2:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg2:     (1 | parasite_phylum) + zstudy_effort + log10(avg_dt)
+    ##       Df    AIC    BIC  logLik deviance  Chisq Chi Df Pr(>Chisq)    
+    ## reg00  3 2272.7 2286.8 -1133.3   2266.7                             
+    ## reg0   8 2262.9 2300.5 -1123.4   2246.9 19.810      5   0.001357 ** 
+    ## reg1   9 2231.3 2273.7 -1106.7   2213.3 33.540      1  6.981e-09 ***
+    ## reg2  10 2230.0 2277.1 -1105.0   2210.0  3.342      1   0.067531 .  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Here are the parameters:
+
+    ## Linear mixed model fit by REML ['lmerMod']
+    ## Formula: 
+    ## hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) +  
+    ##     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) +  
+    ##     (1 | parasite_phylum) + zstudy_effort + log10(avg_dt)
+    ##    Data: filter(st_level, !is.na(avg_dt))
+    ## 
+    ## REML criterion at convergence: 2220.7
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.7630 -0.8461 -0.0738  0.7516  2.9351 
+    ## 
+    ## Random effects:
+    ##  Groups           Name        Variance  Std.Dev. 
+    ##  Parasite.species (Intercept) 2.598e-10 1.612e-05
+    ##  parasite_genus   (Intercept) 9.974e-02 3.158e-01
+    ##  parasite_family  (Intercept) 6.048e-03 7.777e-02
+    ##  parasite_order   (Intercept) 4.142e-02 2.035e-01
+    ##  parasite_class   (Intercept) 0.000e+00 0.000e+00
+    ##  parasite_phylum  (Intercept) 1.383e-10 1.176e-05
+    ##  Residual                     7.787e-01 8.825e-01
+    ## Number of obs: 817, groups:  
+    ## Parasite.species, 609; parasite_genus, 293; parasite_family, 100; parasite_order, 26; parasite_class, 6; parasite_phylum, 3
+    ## 
+    ## Fixed effects:
+    ##               Estimate Std. Error t value
+    ## (Intercept)    2.21856    0.15993  13.872
+    ## zstudy_effort  0.27460    0.04506   6.094
+    ## log10(avg_dt) -0.18201    0.09976  -1.825
+    ## 
+    ## Correlation of Fixed Effects:
+    ##             (Intr) zstdy_
+    ## zstudy_ffrt  0.066       
+    ## lg10(vg_dt) -0.892 -0.144
+    ## convergence code: 0
+    ## boundary (singular) fit: see ?isSingular
+
+And the R<sup>2</sup>.
+
+    ## # A tibble: 4 x 6
+    ##   step            df_used marg_r2 cond_r2 rand_var_explained species_var_explai~
+    ##   <chr>             <dbl>   <dbl>   <dbl>              <dbl>               <dbl>
+    ## 1 within-species~      NA   0       0.099              0.099               0.099
+    ## 2 taxonomy              0   0       0.17               0.17                0    
+    ## 3 study effort          1   0.048   0.204              0.156               0    
+    ## 4 devo                  1   0.052   0.202              0.15                0
+
+The negative relationship between generalism and devo time is much
+clearer when we assume minimal development in paratenic hosts.
+
+    ## Data: filter(st_level, !is.na(avg_dt_paratenic))
+    ## Models:
+    ## reg00: hsi_lcdb_suspcious_rem ~ 1 + (1 | Parasite.species)
+    ## reg0: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg0:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg0:     (1 | parasite_phylum)
+    ## reg1: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg1:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg1:     (1 | parasite_phylum) + zstudy_effort
+    ## reg2: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg2:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg2:     (1 | parasite_phylum) + zstudy_effort + log10(avg_dt_paratenic)
+    ##       Df    AIC    BIC  logLik deviance  Chisq Chi Df Pr(>Chisq)    
+    ## reg00  3 2983.2 2997.9 -1488.6   2977.2                             
+    ## reg0   8 2933.5 2972.6 -1458.8   2917.5 59.730      5  1.382e-11 ***
+    ## reg1   9 2895.2 2939.2 -1438.6   2877.2 40.264      1  2.218e-10 ***
+    ## reg2  10 2812.1 2861.0 -1396.1   2792.1 85.137      1  < 2.2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+    ## # A tibble: 4 x 6
+    ##   step            df_used marg_r2 cond_r2 rand_var_explained species_var_explai~
+    ##   <chr>             <dbl>   <dbl>   <dbl>              <dbl>               <dbl>
+    ## 1 within-species~      NA   0       0.188              0.188               0.188
+    ## 2 taxonomy              0   0       0.209              0.209               0.005
+    ## 3 study effort          1   0.048   0.243              0.195               0    
+    ## 4 devo                  1   0.134   0.272              0.138               0.005
+
+#### Development time - degree days
+
+Now we look at developmental time in temperature-corrected degree days.
 The taxonomic diversity of hosts is negatively related to developmental
 times (quick development - high generalism; long development - low
 generalism).
@@ -294,10 +402,18 @@ paratenic hosts. Short development and generalism are associated.
 
 #### Relative growth rate
 
+There are different ways of measuring growth rate. Here I use this
+formula for relative growth rate (rgr): (ln end size - ln starting size)
+/ time. For modeling, it does not matter if we use log10 or ln, because
+the resulting rgrs are perfectly correlated. Interpretation of rgr is
+easier with natural logs, though, as it approximates the exponential
+growth rate (i.e. the % change per unit time), but only for lower growth
+rates.
+
 Growth rate was unrelated to taxonomic dissimilarity, explaining no
 variation.
 
-    ## Data: filter(st_level, !is.na(rel_growth_rate_dd))
+    ## Data: filter(st_level, !is.na(rg_dd))
     ## Models:
     ## reg00: hsi_lcdb_suspcious_rem ~ 1 + (1 | Parasite.species)
     ## reg0: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
@@ -308,7 +424,7 @@ variation.
     ## reg1:     (1 | parasite_phylum) + zstudy_effort
     ## reg2: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
     ## reg2:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
-    ## reg2:     (1 | parasite_phylum) + zstudy_effort + rel_growth_rate_dd
+    ## reg2:     (1 | parasite_phylum) + zstudy_effort + rg_dd
     ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
     ## reg00  3 1384.5 1397.1 -689.23   1378.5                              
     ## reg0   8 1388.9 1422.6 -686.47   1372.9  5.5118      5     0.3567    
@@ -451,11 +567,102 @@ paratenic hosts.
     ## 6 host x stage          3   0.166   0.299              0.133               0.005
     ## 7 growth                1   0.183   0.332              0.149               0.024
 
-#### Development time
+#### Development time - days
 
 Parasite stages with a taxonomically diverse set of hosts have slightly
 shorter development times, even after accounting for life cycle
 characteristics.
+
+    ## Data: filter(st_level, !is.na(avg_dt))
+    ## Models:
+    ## reg00: hsi_lcdb_suspcious_rem ~ 1 + (1 | Parasite.species)
+    ## reg0: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg0:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg0:     (1 | parasite_phylum)
+    ## reg1: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg1:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg1:     (1 | parasite_phylum) + zstudy_effort
+    ## reg4: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg4:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg4:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg4:     Def.int:Host_no_fac
+    ## reg5: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg5:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg5:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg5:     log10(avg_dt) + Def.int:Host_no_fac
+    ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
+    ## reg00  3 2272.7 2286.8 -1133.3   2266.7                              
+    ## reg0   8 2262.9 2300.5 -1123.4   2246.9 19.8100      5  0.0013566 ** 
+    ## reg1   9 2231.3 2273.7 -1106.7   2213.3 33.5400      1  6.981e-09 ***
+    ## reg4  15 2217.5 2288.1 -1093.8   2187.5 25.8488      6  0.0002376 ***
+    ## reg5  16 2215.4 2290.7 -1091.7   2183.4  4.0878      1  0.0431936 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+    ## # A tibble: 7 x 6
+    ##   step            df_used marg_r2 cond_r2 rand_var_explained species_var_explai~
+    ##   <chr>             <dbl>   <dbl>   <dbl>              <dbl>               <dbl>
+    ## 1 within-species~      NA   0       0.099              0.099               0.099
+    ## 2 taxonomy              0   0       0.17               0.17                0    
+    ## 3 study effort          1   0.048   0.204              0.156               0    
+    ## 4 stage function        1   0.053   0.216              0.163               0    
+    ## 5 host number           3   0.077   0.221              0.144               0    
+    ## 6 host x stage          2   0.08    0.225              0.145               0    
+    ## 7 devo                  1   0.085   0.224              0.139               0
+
+When we assume development does not occur in paratenic hosts, the
+results appear stronger.
+
+    ## Data: filter(st_level, !is.na(avg_dt_paratenic))
+    ## Models:
+    ## reg00: hsi_lcdb_suspcious_rem ~ 1 + (1 | Parasite.species)
+    ## reg0: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg0:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg0:     (1 | parasite_phylum)
+    ## reg1: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg1:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg1:     (1 | parasite_phylum) + zstudy_effort
+    ## reg2: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg2:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg2:     (1 | parasite_phylum) + zstudy_effort + Def.int
+    ## reg3: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg3:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg3:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac
+    ## reg4: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg4:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg4:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg4:     Def.int:Host_no_fac
+    ## reg5: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
+    ## reg5:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
+    ## reg5:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
+    ## reg5:     log10(avg_dt_paratenic) + Def.int:Host_no_fac
+    ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
+    ## reg00  3 2983.2 2997.9 -1488.6   2977.2                              
+    ## reg0   8 2933.5 2972.6 -1458.8   2917.5 59.7305      5  1.382e-11 ***
+    ## reg1   9 2895.2 2939.2 -1438.6   2877.2 40.2645      1  2.218e-10 ***
+    ## reg2  10 2865.5 2914.3 -1422.7   2845.5 31.7623      1  1.742e-08 ***
+    ## reg3  13 2808.0 2871.5 -1391.0   2782.0 63.4834      3  1.059e-13 ***
+    ## reg4  16 2808.0 2886.2 -1388.0   2776.0  5.9823      3  0.1124746    
+    ## reg5  17 2795.8 2878.8 -1380.9   2761.8 14.2653      1  0.0001588 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+    ## # A tibble: 7 x 6
+    ##   step            df_used marg_r2 cond_r2 rand_var_explained species_var_explai~
+    ##   <chr>             <dbl>   <dbl>   <dbl>              <dbl>               <dbl>
+    ## 1 within-species~      NA   0       0.188              0.188               0.188
+    ## 2 taxonomy              0   0       0.209              0.209               0.005
+    ## 3 study effort          1   0.048   0.243              0.195               0    
+    ## 4 stage function        1   0.071   0.26               0.189               0    
+    ## 5 host number           3   0.151   0.297              0.146               0    
+    ## 6 host x stage          3   0.152   0.286              0.134               0    
+    ## 7 growth                1   0.167   0.289              0.122               0
+
+#### Development time - degree days
+
+Now we fit the same models, but with degree days. The results are
+consistent. Even after accounting for life cycle characteristics, there
+is an effect of developmental time.
 
     ## Data: filter(st_level, !is.na(avg_dd))
     ## Models:
@@ -495,7 +702,7 @@ characteristics.
     ## 7 devo                  1   0.091   0.225              0.134               0
 
 When we assume development does not occur in paratenic hosts, the
-results appear stronger..
+results appear stronger.
 
     ## Data: filter(st_level, !is.na(avg_dd_paratenic))
     ## Models:
@@ -547,7 +754,7 @@ results appear stronger..
 Taxonomic dissimilarity is still not related to growth rate after
 accounting for other life cycle characteristics.
 
-    ## Data: filter(st_level, !is.na(rel_growth_rate_dd))
+    ## Data: filter(st_level, !is.na(rg_dd))
     ## Models:
     ## reg00: hsi_lcdb_suspcious_rem ~ 1 + (1 | Parasite.species)
     ## reg0: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
@@ -563,7 +770,7 @@ accounting for other life cycle characteristics.
     ## reg5: hsi_lcdb_suspcious_rem ~ (1 | Parasite.species) + (1 | parasite_genus) + 
     ## reg5:     (1 | parasite_family) + (1 | parasite_order) + (1 | parasite_class) + 
     ## reg5:     (1 | parasite_phylum) + zstudy_effort + Def.int + Host_no_fac + 
-    ## reg5:     rel_growth_rate_dd + Def.int:Host_no_fac
+    ## reg5:     rg_dd + Def.int:Host_no_fac
     ##       Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
     ## reg00  3 1384.5 1397.1 -689.23   1378.5                              
     ## reg0   8 1388.9 1422.6 -686.47   1372.9  5.5118      5     0.3567    

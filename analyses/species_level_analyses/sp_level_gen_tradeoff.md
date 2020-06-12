@@ -1,7 +1,7 @@
 Cross-stage tradeoffs
 ================
 Dan Benesh
-21/01/2020
+12/06/2020
 
 This notebook tests the idea that there is an organism-level constraint
 on generality. If there is a ‘ceiling’ on the total number of hosts a
@@ -73,13 +73,13 @@ cycle length is linear.
     ## reg3.1f:     zstudy_effort + lcl_max_fac
     ## reg4f: log(hr) ~ (1 | parasite_genus) + (1 | parasite_family) + (1 | 
     ## reg4f:     parasite_order) + (1 | parasite_class) + (1 | parasite_phylum) + 
-    ## reg4f:     zstudy_effort + lcl_max_fac + lcl_min
+    ## reg4f:     zstudy_effort + lcl_max_fac + facultative_lc
     ##         Df    AIC    BIC  logLik deviance    Chisq Chi Df Pr(>Chisq)    
     ## reg1f    7 1805.8 1838.9 -895.87   1791.8                               
     ## reg2f    8 1696.3 1734.2 -840.13   1680.3 111.4798      1  < 2.2e-16 ***
     ## reg3f    9 1643.5 1686.2 -812.78   1625.5  54.7129      1  1.395e-13 ***
     ## reg3.1f 11 1646.6 1698.7 -812.31   1624.6   0.9352      2     0.6265    
-    ## reg4f   12 1648.2 1705.0 -812.08   1624.2   0.4672      1     0.4943    
+    ## reg4f   12 1648.6 1705.4 -812.30   1624.6   0.0255      1     0.8731    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -109,13 +109,13 @@ are the same.
     ## reg3.1p:     zstudy_effort + lcl_max_fac
     ## reg4p: round(hr, 0) ~ (1 | obs) + (1 | parasite_genus) + (1 | parasite_family) + 
     ## reg4p:     (1 | parasite_order) + (1 | parasite_class) + (1 | parasite_phylum) + 
-    ## reg4p:     zstudy_effort + lcl_max_fac + lcl_min
+    ## reg4p:     zstudy_effort + lcl_max_fac + facultative_lc
     ##         Df    AIC    BIC  logLik deviance    Chisq Chi Df Pr(>Chisq)    
     ## reg1p    7 3837.3 3870.5 -1911.7   3823.3                               
     ## reg2p    8 3716.2 3754.1 -1850.1   3700.2 123.0907      1  < 2.2e-16 ***
     ## reg3p    9 3679.3 3721.9 -1830.7   3661.3  38.9355      1   4.38e-10 ***
     ## reg3.1p 11 3681.8 3733.9 -1829.9   3659.8   1.4918      2     0.4743    
-    ## reg4p   12 3683.5 3740.4 -1829.8   3659.5   0.2603      1     0.6099    
+    ## reg4p   12 3683.8 3740.6 -1829.9   3659.8   0.0054      1     0.9415    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -129,7 +129,7 @@ rounding. Let’s creat the R<sup>2</sup> table for average generalism.
     ## 2 study effort                    1   0.138   0.429             0.291
     ## 3 life cycle length               1   0.195   0.383             0.188
     ## 4 life cycle length, factor       2   0.193   0.386             0.193
-    ## 5 facultative life cycle          1   0.192   0.381             0.189
+    ## 5 facultative life cycle          1   0.193   0.386             0.193
 
 # Taxonomic dissimilarity
 
@@ -154,13 +154,13 @@ improvement.
     ## reg3.1f:     lcl_max_fac
     ## reg4f: hsi ~ (1 | parasite_genus) + (1 | parasite_family) + (1 | parasite_order) + 
     ## reg4f:     (1 | parasite_class) + (1 | parasite_phylum) + zstudy_effort + 
-    ## reg4f:     lcl_max_fac + lcl_min
+    ## reg4f:     lcl_max_fac + facultative_lc
     ##         Df    AIC    BIC  logLik deviance   Chisq Chi Df Pr(>Chisq)    
     ## reg1f    7 1972.1 2005.3 -979.06   1958.1                              
     ## reg2f    8 1892.7 1930.5 -938.33   1876.7 81.4589      1  < 2.2e-16 ***
     ## reg3f    9 1850.9 1893.5 -916.46   1832.9 43.7440      1  3.743e-11 ***
     ## reg3.1f 11 1853.7 1905.8 -915.86   1831.7  1.2002      2     0.5488    
-    ## reg4f   12 1854.6 1911.4 -915.30   1830.6  1.1269      1     0.2884    
+    ## reg4f   12 1854.8 1911.6 -915.38   1830.8  0.9696      1     0.3248    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
@@ -176,7 +176,7 @@ table for average tax dissimilarity per stage.
     ## 2 study effort                    1   0.103   0.339             0.236
     ## 3 life cycle length               1   0.147   0.345             0.198
     ## 4 life cycle length, factor       2   0.144   0.349             0.205
-    ## 5 facultative life cycle          1   0.144   0.344             0.20
+    ## 5 facultative life cycle          1   0.145   0.345             0.20
 
 # Add in the NHM data for host range
 

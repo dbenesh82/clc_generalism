@@ -291,10 +291,6 @@ Overall, the three tested model types are similar. Therefore, I would opt for th
 As a reminder, I fit the following models: (0) intercept-only, with observation-level random effect for residuals, (1) allow taxonomically correlated errors, (2) add study effort, (3) add life cycle length (max), and (4) add whether cycle is facultative (equivalent to adding min life cycle length). In step 3, adding life cycle length, I added the term as either a continuous predictor or as a factor.
 
 ```{r}
-names()
-```
-
-```{r}
 reg1 <- lmer(hsi_comb ~ 1 + (1|parasite_genus) + (1|parasite_family) + 
                (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum), # taxonomic base model
             data = dat,
