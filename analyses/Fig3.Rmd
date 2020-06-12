@@ -1,0 +1,554 @@
+---
+title: "Fig4"
+author: "Dan Benesh"
+date: "9/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(ape)
+library(RColorBrewer)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+Add on expected values from foodwebs
+
+```{r}
+load(file = "transmission_opportunity_foodwebs/after_glm.RData")
+```
+```{r}
+rm(list= ls()[!(ls() %in% c('t1', 't2'))])
+```
+
+```{r}
+hosts_per_stage <- read.csv(file = "../data/stage_level_combined.csv", header = TRUE)
+```
+
+```{r}
+hosts_per_stage <- mutate(hosts_per_stage, di_plot = factor(Def.int, levels = c('int', 'def')))%>%
+  mutate(di_plot = factor(di_plot, labels = c("intermediate", "definitive")))%>%
+  mutate(Host_no_fac = if_else(Host.no > 4, as.integer(4), Host.no))%>%
+  mutate(Host_no_fac = factor(Host_no_fac))
+```
+```{r}
+# center log-transformed study effort
+hosts_per_stage <- mutate(hosts_per_stage, zstudy_effort = 
+                log10(study_effort+1) - mean( log10(study_effort+1), na.rm=T))
+# hosts_per_stage <- mutate(hosts_per_stage, zstudy_effort =
+#                 log10(study_effort+1) - quantile(log10(study_effort+1), probs = 0.75) )
+
+hosts_per_stage$obs <- factor(1:length(hosts_per_stage$Parasite.species)) # observation level effect for quantifying overdispersion
+```
+
+
+# Host range
+
+```{r}
+f2u <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'), # post-cyclic hosts removed
+       aes(x = factor(Host.no), y = num_hosts_suspicious_removed, color = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black') +
+  geom_point(alpha = 0.2, position = position_jitterdodge(jitter.width = 0.9, jitter.height = 0)) +
+  scale_y_log10() +
+  scale_color_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Host records") +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') + 
+  theme(legend.title = element_blank(),
+        legend.position = c(1,1),
+        legend.justification = c(1,1),
+        legend.background = element_rect(color = 'black'),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  guides(color = FALSE)
+f2u
+```
+
+Here's the same figure, but with means, corrected for study effort and taxonomy.
+
+```{r}
+library(lme4)
+```
+
+```{r}
+reg5x <- glmer(num_hosts_suspicious_removed ~ zstudy_effort + Def.int * Host_no_fac +
+              (1|Parasite.species) + (1|parasite_genus) + (1|parasite_family) + 
+              (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum) +
+              (1|obs),
+           data = filter(hosts_per_stage, Facultative != 'postcyclic', !is.na(hsi_lcdb_suspcious_rem)),
+           family = 'poisson'
+           )
+```
+
+```{r}
+library(MCMCglmm)
+```
+
+```{r}
+# make data where we want predicted values
+datx <- filter(hosts_per_stage, Facultative != 'postcyclic', !is.na(hsi_lcdb_suspcious_rem) )
+datx$pred <- "no"
+
+nd <- datx%>%
+  select(lcl_max_fac, Host.no, Def.int, Host_no_fac)%>%
+  arrange(lcl_max_fac, Host.no)%>%distinct()
+nd <- filter(nd, !(Host.no == 4 & Def.int == 'int'), Host.no != 5)
+nd$zstudy_effort <- 0
+nd$Parasite.species <- hosts_per_stage$Parasite.species[1]
+nd$parasite_genus <- hosts_per_stage$parasite_genus[1]
+nd$parasite_family <- hosts_per_stage$parasite_family[1]
+nd$parasite_order <- hosts_per_stage$parasite_order[1]
+nd$parasite_class <- hosts_per_stage$parasite_class[1]
+nd$parasite_phylum <- hosts_per_stage$parasite_phylum[1]
+nd$pred <- "yes"
+
+# nd$preds <- exp(predict(reg5x, newdata = nd, re.form = NA))
+
+datx <- bind_rows(datx, nd)
+```
+
+```{r}
+reg5x_mc <- MCMCglmm(num_hosts_suspicious_removed ~ zstudy_effort + Def.int * Host_no_fac,
+                   random = ~ Parasite.species + parasite_genus + parasite_family + 
+                     parasite_order + parasite_class + parasite_phylum,
+            data = datx,
+            family = 'poisson',
+            nitt = 100500,
+            thin = 100, burnin = 500
+          )
+```
+
+Here are the fixed effects, `lmer` vs `MCMCglmm`. They are not the same - the model is parameterized differently.
+
+```{r}
+cbind(fixef(reg5x), summary(reg5x_mc$Sol)$statistics[,1])
+```
+```{r}
+# summary(reg5x)
+```
+
+
+Get the credible intervals for plotting.
+
+```{r}
+px <- predict.MCMCglmm(reg5x_mc,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ Parasite.species + parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+px <- bind_cols(datx, data.frame(exp(px)))
+px <- filter(px, pred == "yes")%>%
+  select(Host.no, Host_no_fac, lcl_max_fac, zstudy_effort, Def.int, di_plot, fit, upr, lwr )
+```
+
+
+```{r}
+# nd <- filter(hosts_per_stage, Facultative != 'postcyclic', !is.na(hsi_lcdb_suspcious_rem))%>%
+#   select(lcl_max_fac, Host.no, Def.int, Host_no_fac)%>%
+#   arrange(lcl_max_fac, Host.no)%>%distinct()
+# nd <- filter(nd, !(Host.no == 4 & Def.int == 'int') )
+# nd$zstudy_effort <- 0
+# 
+# nd$preds <- exp(predict(reg5x, newdata = nd, re.form = NA))
+```
+```{r}
+lc_labs <- c(
+  `1` = "1",
+  `2` = "2",
+  `3` = "3",
+  `3+` = "4 or 5"
+)
+```
+
+```{r}
+f2u2 <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'), # post-cyclic hosts removed
+       aes(x = Host_no_fac, y = num_hosts_suspicious_removed, color = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black') +
+  geom_point(alpha = 0.2, position = position_jitterdodge(jitter.width = 0.9, jitter.height = 0)) +
+  scale_y_log10(breaks = c(1, 2, 5, 10, 25, 50, 100)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  scale_color_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Host records") +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x',
+             labeller = labeller(lcl_max_fac = lc_labs)) + 
+  theme(legend.title = element_blank(),
+        legend.position = c(1,1),
+        legend.justification = c(1,1),
+        legend.background = element_rect(color = 'black'),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  guides(color = FALSE) +
+  
+  # preds from MCMC mixed model
+  geom_line(data = px, aes(x = Host.no, y = fit), 
+            alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
+  geom_linerange(data = px, 
+                  aes(x = Host.no, y = fit,
+                      ymin = lwr, ymax = upr), 
+                  size = 1.5, shape = 23, color = 'black', fill = 'black') +
+  geom_point(data = px,
+             aes(x = Host.no, y = fit),
+             size = 4,
+             shape = 23, color = 'black', fill = 'black')
+f2u2
+```
+
+And now put food web expectations on top of it.
+
+```{r}
+#  calculate percent changes for different proportions of available first hosts infected
+fe <- t1@beta
+
+h1 <- fe[1] # first host
+h2 <- fe[2] # secon host
+h3 <- fe[3] # third host
+h4 <- fe[4] # fourt host
+pp <- fe[5]
+pph2 <- fe[6]
+pph3 <- fe[7]
+pph4 <- fe[8]
+
+
+for(p in seq(0.01, 1, by = 0.005)) {
+  
+  preds <- c(h1 + pp*p,
+             h1 + h2 + pp*p + pph2*p,
+             h1 + h3 + pp*p + pph3*p,
+             h1 + h4 + pp*p + pph4*p)
+  preds <- exp(preds)
+  # perc_change <- c( (preds[2] - preds[1])/preds[1],
+  #                   (preds[3] - preds[2])/preds[2],
+  #                   (preds[4] - preds[3])/preds[3]
+  #                   )
+  d <- as.data.frame(cbind(p, preds, Host.no = c(1,2,3,4)))
+  if(p == 0.01) {
+    d_out <- d
+  } else {
+    d_out <- bind_rows(d_out, d)
+  }
+}
+d_out <- rename(d_out, hosts = preds, perc = p)
+```
+```{r}
+d_out1 <- filter(d_out, Host.no < 2)
+d_out2 <- filter(d_out, Host.no < 3)
+d_out3 <- filter(d_out, Host.no < 4)
+d_out1$lcl_max_fac <- "1"
+d_out2$lcl_max_fac <- "2"
+d_out3$lcl_max_fac <- "3"
+d_out$lcl_max_fac <- "3+"
+d_out <- bind_rows(d_out, d_out1, d_out2, d_out3)
+d_out <- mutate(d_out, Host_no_fac = if_else(Host.no > 4, as.integer(4), as.integer(Host.no)))%>%
+  mutate(Host_no_fac = factor(Host_no_fac))%>%
+  mutate(hosts = if_else(hosts < 1, NA_real_, hosts))
+rm(d, d_out1, d_out2, d_out3, fe, h1, h2, h3, h4, pp, pph2, pph3, pph4, p, preds)
+```
+
+```{r}
+f2u2 <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'), # post-cyclic hosts removed
+       aes(x = Host_no_fac, y = num_hosts_suspicious_removed, fill = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black', fill = NA) +
+  geom_point(position = position_jitterdodge(jitter.width = 1, jitter.height = 0),
+             color = 'white', shape = 21, alpha = 0.3, size = 2 ) +
+  scale_y_log10(breaks = c(1, 2, 5, 10, 25, 50, 100)) +
+  # scale_y_log10(limits = c(0.95,104), breaks = c(1, 5, 10, 25, 50, 100)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  scale_color_distiller(type = 'div', palette = 'RdBu', breaks = c(0.01, 0.25, 0.5, 0.75, 1.0)) +
+  scale_fill_brewer(type = "qual", palette = "Set2") +
+  # scale_color_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Host records", 
+       color = "Primary\nconsumers as\nfirst hosts (%)") +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x',
+             labeller = labeller(lcl_max_fac = lc_labs)) + 
+  theme(
+    # legend.title = element_blank(),
+    # legend.position = c(1,1),
+    # legend.justification = c(1,1),
+        legend.background = element_rect(color = 'black'),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  guides(fill = FALSE) +
+  
+  # preds from MCMC mixed model
+  geom_line(data = px, aes(x = Host.no, y = fit), 
+            alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
+  geom_linerange(data = px, 
+                  aes(x = Host.no, y = fit,
+                      ymin = lwr, ymax = upr), 
+                  size = 1.5, shape = 23, color = 'black') +
+  geom_point(data = px,
+             aes(x = Host.no, y = fit),
+             size = 4,
+             shape = 23, color = 'black', fill = "black") +
+  
+  # preds from food web
+  geom_line(data = d_out,
+            aes(x = Host_no_fac, y = hosts, group = perc, color = perc, fill = NULL),
+            linetype = 'solid', alpha = 0.25) +
+  geom_point(data = filter(d_out, lcl_max_fac == "1"),
+            aes(x = Host_no_fac, y = hosts, color = perc, fill = NULL),
+            alpha = 0.25)
+
+f2u2
+```
+
+
+# Taxonomic dissimilarity index
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+
+The generalism of worms in second or third intermediate hosts is also clear when we split them by life cycle length. 
+
+```{r}
+f2l <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'),
+       aes(x = factor(Host.no), y = hsi_lcdb_suspcious_rem, color = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black') +
+  geom_point(alpha = 0.2, position = position_jitterdodge(jitter.width = 0.8, jitter.height = 0)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_color_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Taxonomic dissimilarity") +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') + 
+  theme(legend.title = element_blank(),
+        legend.position = c(0.98,0.98),
+        legend.justification = c(1,1),
+        legend.direction = 'horizontal',
+        legend.background = element_rect(color = 'black'),
+        legend.margin = margin(t=0.5, r=0.5, b = 0.5, l=0.5),
+        legend.key = element_rect(fill = NA),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  guides(color = guide_legend(override.aes = list(alpha = 1)))
+f2l
+```
+
+Here's the same figure with predicteds.
+
+```{r}
+reg5xx <- lmer(hsi_lcdb_suspcious_rem ~ zstudy_effort + Def.int * Host_no_fac +
+              (1|Parasite.species) + (1|parasite_genus) + (1|parasite_family) + 
+              (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+              data = filter(hosts_per_stage, Facultative != 'postcyclic', !is.na(hsi_lcdb_suspcious_rem))
+              )
+```
+
+```{r}
+reg5xx_mc <- MCMCglmm(hsi_lcdb_suspcious_rem ~ zstudy_effort + Def.int * Host_no_fac,
+                   random = ~ Parasite.species + parasite_genus + parasite_family + 
+                     parasite_order + parasite_class + parasite_phylum,
+            data = datx,
+            family = 'gaussian',
+            nitt = 50500,
+            thin = 50, burnin = 500
+          )
+```
+```{r}
+px2 <- predict.MCMCglmm(reg5xx_mc,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ Parasite.species + parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+px2 <- bind_cols(datx, data.frame(px2))
+px2 <- filter(px2, pred == "yes")%>%
+  select(Host.no, Host_no_fac, lcl_max_fac, zstudy_effort, Def.int, di_plot, fit, upr, lwr )
+```
+
+```{r}
+f2l2 <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'),
+       aes(x = Host_no_fac, y = hsi_lcdb_suspcious_rem, color = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black') +
+  geom_point(alpha = 0.2, 
+             # aes(size = study_effort),
+             position = position_jitterdodge(jitter.width = 0.9, jitter.height = 0)) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  scale_color_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Taxonomic dissimilarity") +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x',
+             labeller = labeller(lcl_max_fac = lc_labs)) +  
+  theme(legend.title = element_blank(),
+        legend.position = c(0.98,0.98),
+        legend.justification = c(1,1),
+        legend.direction = 'horizontal',
+        legend.background = element_rect(color = 'black'),
+        legend.margin = margin(t=0.5, r=0.5, b = 0.5, l=0.5),
+        legend.key = element_rect(fill = NA),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  guides(size = F, color = guide_legend(override.aes = list(alpha = 1))) +
+  
+  # preds from MCMC mixed model
+  geom_line(data = px2, aes(x = Host.no, y = fit), 
+            alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
+  geom_linerange(data = px2, 
+                  aes(x = Host.no, y = fit,
+                      ymin = lwr, ymax = upr), 
+                  size = 1.5, shape = 23, color = 'black', fill = 'black') +
+  geom_point(data = px2,
+             aes(x = Host.no, y = fit),
+             size = 4,
+             shape = 23, color = 'black', fill = 'black')
+
+f2l2  
+```
+
+Now add the food web expectations on top.
+
+```{r}
+#  calculate percent changes for different proportions of available first hosts infected
+fe <- t2@beta
+
+h1 <- fe[1] # first host
+h2 <- fe[2] # secon host
+h3 <- fe[3] # third host
+h4 <- fe[4] # fourt host
+pp <- fe[5]
+pph2 <- fe[6]
+pph3 <- fe[7]
+pph4 <- fe[8]
+
+
+for(p in seq(0.01, 1, by = 0.005)) {
+  
+  preds <- c(h1 + pp*p,
+             h1 + h2 + pp*p + pph2*p,
+             h1 + h3 + pp*p + pph3*p,
+             h1 + h4 + pp*p + pph4*p)
+  # preds <- exp(preds)
+  # perc_change <- c( (preds[2] - preds[1])/preds[1],
+  #                   (preds[3] - preds[2])/preds[2],
+  #                   (preds[4] - preds[3])/preds[3]
+  #                   )
+  d <- as.data.frame(cbind(p, preds, Host.no = c(1,2,3,4)))
+  if(p == 0.01) {
+    d_out2 <- d
+  } else {
+    d_out2 <- bind_rows(d_out2, d)
+  }
+}
+d_out2 <- rename(d_out2, hosts = preds, perc = p)
+
+d_out21 <- filter(d_out2, Host.no < 2)
+d_out22 <- filter(d_out2, Host.no < 3)
+d_out23 <- filter(d_out2, Host.no < 4)
+d_out21$lcl_max_fac <- "1"
+d_out22$lcl_max_fac <- "2"
+d_out23$lcl_max_fac <- "3"
+d_out2$lcl_max_fac <- "3+"
+d_out2 <- bind_rows(d_out2, d_out21, d_out22, d_out23)
+d_out2 <- mutate(d_out2, Host_no_fac = if_else(Host.no > 4, as.integer(4), as.integer(Host.no)))%>%
+  mutate(Host_no_fac = factor(Host_no_fac))%>%
+  mutate(hosts = if_else(hosts < 1, NA_real_, hosts),
+         di_plot = "intermediate")
+rm(d, d_out21, d_out22, d_out23, fe, h1, h2, h3, h4, pp, pph2, pph3, pph4, p, preds)
+```
+
+
+
+```{r}
+f2l2 <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic'), # post-cyclic hosts removed
+       aes(x = Host_no_fac, y = hsi_lcdb_suspcious_rem, fill = di_plot)) + 
+  geom_boxplot(outlier.color = NA, color = 'black', fill = NA) +
+  geom_point(position = position_jitterdodge(jitter.width = 1, jitter.height = 0),
+             color = 'white', shape = 21, alpha = 0.3, size = 2) +
+  scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_fill_brewer(type = "qual", palette = "Set2") +
+  # scale_color_brewer(type = "qual", palette = "Set2") +
+  labs(x = "Stage (host) in life cycle", y = "Taxonomic dissimilarity") +
+  facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x',
+             labeller = labeller(lcl_max_fac = lc_labs)) + 
+  theme(legend.title = element_blank(),
+        legend.background = element_rect(color = 'black'),
+        # legend.margin = margin(t=0.5, r=0.5, b = 0.5, l=0.5),
+        legend.key = element_rect(fill = NA),
+        strip.text = element_text(face = "bold"),
+        strip.background = element_rect(fill = 'grey95'),
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  guides(color = FALSE, fill = guide_legend(override.aes = list(alpha = 1, size = 4))) +
+  
+  # preds from MCMC mixed model
+  geom_line(data = px2, aes(x = Host.no, y = fit), 
+            alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
+  geom_linerange(data = px2, 
+                  aes(x = Host.no, y = fit,
+                      ymin = lwr, ymax = upr), 
+                  size = 1.5, shape = 23, color = 'black') +
+  geom_point(data = px2,
+             aes(x = Host.no, y = fit),
+             size = 4,
+             shape = 23, color = 'black', fill = "black") +
+  
+  # preds from food web
+  geom_line(data = d_out2,
+            aes(x = Host_no_fac, y = hosts, group = perc, color = perc),
+            linetype = 'solid', alpha = 0.25) +
+  geom_point(data = filter(d_out2, lcl_max_fac == "1"),
+            aes(x = Host_no_fac, y = hosts, color = perc),
+            alpha = 0.25, fill = NA)
+
+f2l2
+```
+
+
+Combine the two figures
+
+```{r}
+library(cowplot)
+```
+
+```{r}
+f2u2 <- f2u2 + 
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_blank())
+
+f2l2 <- f2l2 +
+  theme(strip.background = element_blank(),
+  strip.text.x = element_blank())
+```
+
+```{r}
+f2c <- plot_grid(f2u2, f2l2, ncol = 1, align="hv")
+# f2c
+```
+
+
+
+Export as SVG and PNG, first Fig 4a...
+
+```{r}
+fig_width <- 9
+fig_height <- 4.5
+
+# ggsave(filename = "../figs/Fig4u.png", plot = f2u2, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
+
+...then Fig 4b.
+
+```{r}
+# ggsave(filename = "../figs/Fig4l.png", plot = f2l2, device = 'png', units = 'in', width = fig_width, height = fig_height)
+```
+
+Edit the combined figure by bringing the upper plot down, and make the legend more evenly spaced.
+
+```{r}
+ggsave(filename = "../figs/Fig3_comb.png", plot = f2c, device = 'png', units = "in", width = fig_width, height = fig_height*2)
+ggsave(filename = "../figs/Fig3_comb.svg", plot = f2c, device = 'svg', units = "in", width = fig_width, height = fig_height*2)
+```
+

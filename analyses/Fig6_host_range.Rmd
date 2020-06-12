@@ -1,0 +1,588 @@
+---
+title: "Look for tradeoffs driving host specificity"
+output: github_document
+---
+
+Why are complex life cycle parasites specific at one stage but not another? Here I explore tradeoffs that might affect the evolution of host specificity in complex life cycles.
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(ape)
+library(RColorBrewer)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+options(stringsAsFactors = FALSE)
+theme_set(new = theme_bw())
+```
+
+```{r importdata}
+lcdb <- read.csv(file = "../data/CLC_database_updated_names.csv", header = TRUE)
+st_level <- read.csv(file = "../data/stage_level_combined.csv", header = TRUE)
+tree <- read.tree(file = "parasite_phylogeny/full_tree_time_calib.nex")
+tree_tips <- read.csv(file = "../data/data_tree_tips_table.csv")
+```
+
+[Elsewhere](../stage_level_analyses/make_stage_level_df.Rmd), I created a data table at the level of stages within parasite species. I start by looking at correlations between variables measured at this level, like host records, taxonomic dissimilarity, development time, growth, etc. Here's a correlation matrix, but it might not be too useful, because several variables need log transformation.
+
+```{r}
+round(cor(select(st_level, study_effort, num_hosts_suspicious_removed, hsi_lcdb_suspcious_rem, avg_dd, rel_growth_len, rel_growth_biov), use = "pairwise"),2)
+```
+
+```{r}
+tax.ranks <- c('genus', 'family', 'order', 'class', 'phylum') # for axis label
+```
+
+I calculated relative and absolute growth for parasite stages, as well as the time needed to complete development at a given stage, in days and degree days.
+
+```{r}
+# create starting sizes
+st_level <- rename(st_level, stage_length_end = stage_body_length, stage_biov_end = stage_biov)%>%
+  mutate(stage_length_start = stage_length_end - abs_growth_len,
+         stage_biov_start = stage_biov_end - abs_growth_biov)
+```
+
+There is less development time data than growth data. And growth was calculated with two different size variables: length and biovolume. Biovolume had more missing data, because biovolume was calculated with lengths and widths and there were more missing widths than lengths.
+
+```{r}
+sapply(select(st_level, avg_dt, avg_dd, abs_growth_len, abs_growth_biov), function(x){sum(is.na(x))})
+```
+
+Therefore, for any paratenic host stage without growth data, I set the growth to zero and then replotted the data. This makes the negative relationship clearer, especially for worms in intermediate hosts (since those are the paratenic hosts).
+
+```{r}
+st_level <- mutate(st_level, rel_growth_paratenic = if_else(Facultative == "paratenic" & is.na(rel_growth_biov), 0, rel_growth_biov)) # if paratenic, then dt = 0
+```
+
+```{r}
+st_level <- mutate(st_level, 
+                   # if paratenic, then dt = 1 day at room temp
+                   avg_dt_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dt), 1, avg_dt),
+                   avg_dd_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dd), 20, avg_dd)) 
+```
+
+```{r}
+st_level <- mutate(st_level, rel_growth_rate_dt = rel_growth_biov/avg_dt, rel_growth_rate_dd = rel_growth_biov/avg_dd) # make growth rate variable
+```
+```{r}
+st_level <- mutate(st_level, Host_no_fac = if_else(Host.no > 4, as.integer(4), Host.no))%>%
+  mutate(Host_no_fac = factor(Host_no_fac))
+# center log-transformed study effort
+st_level <- mutate(st_level, zstudy_effort = log10(study_effort+1) - mean( log10(study_effort+1), na.rm=T))
+```
+```{r}
+st_level <- mutate(st_level, paratenic = if_else(Facultative == "paratenic", "yes", "no"),
+                   imputed_gr = if_else(rel_growth_paratenic == 0, "yes", "no"),
+                   imputed_dt = if_else(avg_dt_paratenic == 1, "yes", "no"))
+```
+```{r}
+st_level <- mutate(st_level,
+                   log_dd = log10(avg_dd),
+                   log_dd_p = log10(avg_dd_paratenic),
+                   log_dt = log10(avg_dt),
+                   log_dt_p = log10(avg_dt_paratenic))
+st_level$obs <- factor(1:length(st_level$Parasite.species)) # observation level effect for quantifying overdispersion
+```
+
+
+# Models
+
+```{r}
+library(lme4)
+library(MCMCglmm)
+```
+
+
+# Host range
+
+### Case 1
+#### Relative growth
+
+Plot results. Let's get best estimates and CIs from MCMCglmm
+
+
+```{r}
+datx <- filter(st_level, !is.na(rel_growth_biov), !is.na(num_hosts_suspicious_removed))
+datx$pred <- "no"
+datx2 <- filter(st_level, !is.na(rel_growth_paratenic), !is.na(num_hosts_suspicious_removed))
+datx2$pred <- "no"
+nd <- data.frame(zstudy_effort=0,
+                 rel_growth_biov = seq(min(st_level$rel_growth_biov, na.rm = T),
+                                            max(st_level$rel_growth_biov, na.rm = T),
+                                            length.out = 50),
+                 rel_growth_paratenic = seq(min(st_level$rel_growth_paratenic, na.rm = T),
+                                            max(st_level$rel_growth_paratenic, na.rm = T),
+                                            length.out = 50),
+                 Parasite.species = datx$Parasite.species[1],
+                 parasite_genus = datx$parasite_genus[1],
+                 parasite_family = datx$parasite_family[1],
+                 parasite_order = datx$parasite_order[1],
+                 parasite_class = datx$parasite_class[1],
+                 parasite_phylum = datx$parasite_phylum[1])
+nd$pred <- "yes"
+datx <- bind_rows(datx, nd)
+datx2 <- bind_rows(datx2, nd)
+```
+```{r}
+regp_mc1 <- MCMCglmm(num_hosts_suspicious_removed ~ zstudy_effort + rel_growth_biov,
+                    random = ~ Parasite.species + parasite_genus + parasite_family + 
+                      parasite_order + parasite_class + parasite_phylum,
+                    data = datx,
+                    family = "poisson",
+                    nitt = 10500, thin = 30, burnin = 500) # just w/in species effect
+regp_mc2 <- MCMCglmm(num_hosts_suspicious_removed ~ zstudy_effort + rel_growth_paratenic,
+                    random = ~ Parasite.species + parasite_genus + parasite_family + 
+                      parasite_order + parasite_class + parasite_phylum,
+                    data = datx2,
+                    family = "poisson",
+                    nitt = 10500, thin = 30, burnin = 500) # just w/in species effect
+```
+
+Predict credible intervals
+
+```{r}
+p1 <- predict.MCMCglmm(regp_mc1,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ Parasite.species + parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+p1 <- bind_cols(datx, data.frame(exp(p1)))
+p1 <- filter(p1, pred == "yes")
+p1 <- mutate(p1, lwr = if_else(lwr < 1, 1, lwr))
+
+p2 <- predict.MCMCglmm(regp_mc2,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ Parasite.species + parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+p2 <- bind_cols(datx2, data.frame(exp(p2)))
+p2 <- filter(p2, pred == "yes")
+p2 <- mutate(p2, lwr = if_else(lwr < 1, 1, lwr))
+```
+
+Plots with predicted values. Predicted and CIs were basically the same with MCMC and LMER. We'll stick with bootstrapped CIs from LMER as this is what the majority of paper is based on.
+
+```{r}
+f7a <- ggplot(filter(st_level, !is.na(rel_growth_paratenic)),
+       aes(y = num_hosts_suspicious_removed, x = rel_growth_paratenic)) +
+  geom_point(aes(size = study_effort, shape = imputed_gr), 
+             alpha = 0.1) +
+  
+  # PRED - MCMC WITHOUT IMP
+  geom_ribbon(data = p1,
+              aes(y = fit, x = rel_growth_biov,
+                  ymin = lwr, ymax = upr),
+              alpha = 0.5, fill = "gray") +
+  geom_line(data = p1, aes(y = fit, x = rel_growth_biov),
+            linetype = "solid", color = "black") +
+
+  # PRED - MCMC WITH IMP
+  geom_ribbon(data = p2,
+              aes(y = fit, x = rel_growth_paratenic,
+                  ymin = lwr, ymax = upr),
+              alpha = 0.5, fill = "gray") +
+  geom_line(data = p2, aes(y = fit, x = rel_growth_paratenic),
+            linetype = "dashed", color = "black") +
+  
+  # # PRED - LMER WITHOUT IMP
+  # geom_ribbon(data = boot_means_fs,
+  #             aes(y = med_fs, x = rel_growth_biov,
+  #                 ymin = low_fs, ymax = high_fs),
+  #             alpha = 0.5, fill = "gray") +
+  # geom_line(data = boot_means_fs, aes(y = med_fs, x = rel_growth_biov), 
+  #           linetype = "solid", color = "black") +
+  # 
+  # # PRED - LMER WITH IMP
+  # geom_ribbon(data = boot_means_fs2,
+  #             aes(y = med_fs, x = rel_growth_paratenic,
+  #                 ymin = low_fs, ymax = high_fs),
+  #             alpha = 0.5, fill = "gray") +
+  # geom_line(data = boot_means_fs2, aes(y = med_fs, x = rel_growth_paratenic),
+  #           linetype = "dashed", color = "black") +
+  # geom_ribbon(data = boot_means_fs3,
+  #             aes(y = med_fs, x = rel_growth_paratenic,
+  #                 ymin = low_fs, ymax = high_fs),
+  #             alpha = 0.2) +
+  # geom_line(data = boot_means_fs3, aes(y = med_fs, x = rel_growth_paratenic),
+  #           linetype = "dotted") +
+  scale_shape_manual(values = c(16,17)) +
+  scale_y_log10(limits = c(1, max(st_level$num_hosts_suspicious_removed, na.rm=T)),
+                breaks = c(1, 2, 5, 10, 25, 50, 100)) +
+  guides(size=F) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Relative growth\n(orders of magnitude size increase)", 
+       shape = "Imputed?", y = "Number of hosts")
+f7a
+```
+
+
+
+
+#### Development time - degree days
+
+The taxonomic diversity of hosts is negatively related to developmental times (quick development - high generalism; long development - low generalism). 
+
+
+```{r}
+datx <- filter(st_level, !is.na(log_dd), !is.na(num_hosts_suspicious_removed))
+datx$pred <- "no"
+datx2 <- filter(st_level, !is.na(log_dd_p), !is.na(num_hosts_suspicious_removed))
+datx2$pred <- "no"
+nd <- data.frame(zstudy_effort=0,
+                 log_dd = seq(min(st_level$log_dd, na.rm = T),
+                              max(st_level$log_dd, na.rm = T),
+                              length.out = 50),
+                 log_dd_p = seq(min(st_level$log_dd_p, na.rm = T),
+                                max(st_level$log_dd_p, na.rm = T),
+                                length.out = 50),
+                 Parasite.species = datx$Parasite.species[1],
+                 parasite_genus = datx$parasite_genus[1],
+                 parasite_family = datx$parasite_family[1],
+                 parasite_order = datx$parasite_order[1],
+                 parasite_class = datx$parasite_class[1],
+                 parasite_phylum = datx$parasite_phylum[1])
+nd$pred <- "yes"
+datx <- bind_rows(datx, nd)
+datx2 <- bind_rows(datx2, nd)
+```
+```{r}
+regdt_mc1 <- MCMCglmm(num_hosts_suspicious_removed ~ zstudy_effort + log_dd,
+                    random = ~ Parasite.species + parasite_genus + parasite_family + 
+                      parasite_order + parasite_class + parasite_phylum,
+                    data = datx,
+                    family = "poisson",
+                    nitt = 10500, thin = 30, burnin = 500) # just w/in species effect
+regdt_mc2 <- MCMCglmm(num_hosts_suspicious_removed ~ zstudy_effort + log_dd_p,
+                    random = ~ Parasite.species + parasite_genus + parasite_family + 
+                      parasite_order + parasite_class + parasite_phylum,
+                    data = datx2,
+                    family = "poisson",
+                    nitt = 10500, thin = 30, burnin = 500) # just w/in species effect
+```
+
+
+Predict credible intervals
+
+```{r}
+p1 <- predict.MCMCglmm(regdt_mc1,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ Parasite.species + parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+p1 <- bind_cols(datx, data.frame(exp(p1)))
+p1 <- filter(p1, pred == "yes")
+p1 <- mutate(p1, lwr = if_else(lwr < 1, 1, lwr))
+
+p2 <- predict.MCMCglmm(regdt_mc2,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ Parasite.species + parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+p2 <- bind_cols(datx2, data.frame(exp(p2)))
+p2 <- filter(p2, pred == "yes")
+p2 <- mutate(p2, lwr = if_else(lwr < 1, 1, lwr))
+```
+
+
+Plots
+
+
+```{r}
+f7b <- ggplot(filter(st_level, !is.na(log_dd_p), !is.na(hsi_lcdb_suspcious_rem)),
+       aes(y = num_hosts_suspicious_removed, x = 10^log_dd_p)) +
+  geom_point(aes(size = study_effort, shape = imputed_dt),
+             alpha = 0.1) +
+  
+  # PRED - MCMC WITHOUT IMP
+  geom_ribbon(data = p1,
+              aes(y = fit, x = 10^log_dd,
+                  ymin = lwr, ymax = upr),
+              alpha = 0.5, fill = "gray") +
+  geom_line(data = p1, aes(y = fit, x = 10^log_dd),
+            linetype = "solid", color = "black") +
+  
+  # PRED - MCMC WITH IMP
+  geom_ribbon(data = p2,
+              aes(y = fit, x = 10^log_dd_p,
+                  ymin = lwr, ymax = upr),
+              alpha = 0.5, fill = "gray") +
+  geom_line(data = p2, aes(y = fit, x = 10^log_dd_p),
+            linetype = "dashed", color = "black") +
+
+  # PRED - LMER WITHOUT IMP
+  # geom_ribbon(data = boot_means_dt,
+  #             aes(y = med_dt, x = 10^log_dd,
+  #                 ymin = low_dt, ymax = high_dt),
+  #             alpha = 0.5, fill = "darkgray") +
+  # geom_line(data = boot_means_dt, aes(y = med_dt, x = 10^log_dd)) +
+  
+  # PRED - LMER WITH IMP
+  # geom_ribbon(data = boot_means_dt2,
+  #             aes(y = med_dt, x = 10^log_dd_p,
+  #                 ymin = low_dt, ymax = high_dt),
+  #             alpha = 0.5, fill = "darkgray") +
+  # geom_line(data = boot_means_dt2, aes(y = med_dt, x = 10^log_dd_p),
+  #           linetype = "dashed") +
+  guides(size =F) +
+  scale_x_log10() +
+  scale_shape_manual(values = c(16,17)) +
+  scale_y_log10(limits = c(1, max(st_level$num_hosts_suspicious_removed, na.rm=T)),
+                breaks = c(1, 2, 5, 10, 25, 50, 100)) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Development time (degree days)", 
+       shape = "Imputed?", y = "Number of hosts")
+f7b
+```
+
+
+#### Relative growth rate
+
+```{r}
+st_level <- mutate(st_level, 
+                   # relative growth rate
+                   rg = log(stage_biov_end) - log(stage_biov_start),
+                   rg_dt = (log(stage_biov_end) - log(stage_biov_start))/avg_dt,
+                   #rg_dt2 = (log10(stage_biov_end) - log10(stage_biov_start))/avg_dt, # perfectly correlates with rgr with ln
+                   rg_dd = (log(stage_biov_end) - log(stage_biov_start))/avg_dd,
+                   rg_rt = (log(stage_biov_end) - log(stage_biov_start))/(avg_dd/15))%>%
+  # percent change in size per unit time
+  mutate(rg_dt_perc = exp(rg_dt)-1, 
+         rg_dd_perc = exp(rg_dd)-1,
+         rg_rt_perc = exp(rg_rt)-1)%>% 
+  # doubling times
+  mutate(doubling_time_days = log(2)/rg_dt_perc,
+         doubling_time_days_rt = log(2)/rg_rt_perc)
+```
+
+There are different ways of measuring growth rate. Here I use this formula for relative growth rate (rgr): (ln end size - ln starting size) / time. For modeling, it does not matter if we use log10 or ln, because the resulting rgrs are perfectly correlated. Interpretation of rgr is easier with natural logs, though, as it approximates the exponential growth rate (i.e. the % change per unit time), but only for lower growth rates. As growth accelerates, the relationship between rgr and the exponential growth rate (% change per day) diverges a bit.
+
+```{r}
+ggplot(st_level, 
+       aes(x = rg_rt, y = rg_rt_perc),
+       ) +
+  geom_point( alpha = 0.3) +
+  geom_abline() +
+  labs(x = "Relative growth rate (per day at room temp)", y = "Compound growth (% change per day at room temp)")
+```
+
+We can also convert ln-based rgr to doubling time [ ln(2)/exponential growth rate ], which is perhaps more intuitive. However, since some worms decreased in size, doubling time is halving time in these cases. Here is the distribution of doubling times. It takes about 5 days at room temp to double in size. Most of the half-lives are long, given worms decreases only slightly in size.
+
+```{r}
+ggplot(st_level,
+       aes(x = abs(doubling_time_days_rt))) +
+  geom_histogram(aes(fill = doubling_time_days_rt<0)) +
+  scale_x_log10(breaks = c(1, 3, 5, 7, 10, 25, 50, 100)) +
+  scale_fill_discrete(labels = c("doubling time", "half-life")) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Doubling time in days at room temp", fill = NULL)
+```
+
+Fit the models. Growth rate was unrelated to taxonomic dissimilarity, explaining no variation.
+
+```{r}
+reg00rg <- glmer(num_hosts_suspicious_removed ~ 1 + (1|Parasite.species) + (1|obs),
+             data = filter(st_level, !is.na(rg_dd), !is.na(hsi_lcdb_suspcious_rem)),
+             family = "poisson") # just w/in species effect
+reg0rg <- update(reg00rg, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1rg <- update(reg0rg, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2rg <- update(reg1rg, . ~ . + rg_dd) # add rel growth
+anova(reg00rg, reg0rg, reg1rg, reg2rg)
+```
+
+It does not matter if we change the way we measure relative growth. Such as by using days instead of degree days.
+
+```{r}
+reg2rgx <- update(reg1rg, . ~ . + rg_dt) # add rel growth
+anova(reg1rg, reg2rgx)
+```
+
+Or using the percent change in size per day at room temp.
+
+```{r}
+reg2rgx <- update(reg1rg, . ~ . + rg_rt_perc) # add rel growth
+anova(reg1rg, reg2rgx)
+```
+
+Or using doubling time instead of rgr.
+
+```{r}
+reg2rgy <- update(reg1rg, . ~ . + doubling_time_days_rt) # add rel growth
+anova(reg1rg, reg2rgy)
+```
+
+
+
+
+Let's therefore only plot the worms with clear growth. And to make the plot more interpretable, we'll change the x-axis from relative growth in degree days to relative growth in days at room temp (20).
+
+```{r}
+reg2rgx <- update(reg1rg, . ~ . + rg_rt) # add rel growth
+```
+
+
+
+```{r}
+datx <- filter(st_level, !is.na(rg_rt), !is.na(num_hosts_suspicious_removed))
+datx$pred <- "no"
+nd <- data.frame(zstudy_effort=0,
+                 rg_rt = seq(min(st_level$rg_rt, na.rm = T),
+                             max(st_level$rg_rt, na.rm = T),
+                             length.out = 50),
+                 Parasite.species = datx$Parasite.species[1],
+                 parasite_genus = datx$parasite_genus[1],
+                 parasite_family = datx$parasite_family[1],
+                 parasite_order = datx$parasite_order[1],
+                 parasite_class = datx$parasite_class[1],
+                 parasite_phylum = datx$parasite_phylum[1])
+nd$pred <- "yes"
+datx <- bind_rows(datx, nd)
+```
+```{r}
+reg_rgrt_mc1 <- MCMCglmm(num_hosts_suspicious_removed ~ zstudy_effort + rg_rt,
+                    random = ~ Parasite.species + parasite_genus + parasite_family + 
+                      parasite_order + parasite_class + parasite_phylum,
+                    data = datx,
+                    family = "poisson",
+                    nitt = 10500, thin = 30, burnin = 500) # just w/in species effect
+```
+
+```{r}
+summary(reg_rgrt_mc1)
+```
+
+```{r}
+summary(reg2rgx)
+```
+
+Predict credible intervals
+
+```{r}
+p1 <- predict.MCMCglmm(reg_rgrt_mc1,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ Parasite.species + parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+p1 <- bind_cols(datx, data.frame(exp(p1)))
+p1 <- filter(p1, pred == "yes")
+p1 <- mutate(p1, lwr = if_else(lwr < 1, 1, lwr))
+
+```
+
+```{r}
+f7cc <- ggplot(filter(st_level, !is.na(rg_rt)),
+       aes(y = num_hosts_suspicious_removed, x = rg_rt)) +
+  geom_point(aes(size = study_effort), alpha = 0.1) +
+  geom_ribbon(data = p1,
+              aes(y = fit, x = rg_rt,
+                  ymin = lwr, ymax = upr),
+              alpha = 0.5, fill = "gray") +
+  geom_line(data = p1, aes(y = fit, x = rg_rt)) +
+  scale_shape_manual(values = c(16)) +
+  guides(size =F) +
+  scale_y_log10(limits = c(1, max(st_level$num_hosts_suspicious_removed, na.rm=T)),
+                breaks = c(1, 2, 5, 10, 25, 50, 100)) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Relative growth rate\n(~% size increase per day at 20°C)", y = "Number of hosts")
+f7cc
+```
+
+# Growth rate as combo of growth and devo
+
+If parasite stages infect hosts from different classes, then they exhibit short development and little growth. By contrast, if hosts for a given parasite stage tend to be of the same genus or family, then the parasite stage tend to spend time growing.
+
+```{r}
+f7c <- ggplot(st_level, aes(x = avg_dd_paratenic, y = rel_growth_paratenic)) +
+  scale_x_log10() + 
+  geom_point(aes(shape = paratenic), alpha = 0.1) +
+  # geom_point(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p, color = generalist_fac),
+  #            alpha = 0.75, size = 2.5) +
+  # geom_errorbar(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p, 
+  #                                       ymin = avg_g_p - 1.96*se_g_p, ymax = avg_g_p + 1.96*se_g_p,
+  #                                       color = generalist_fac),
+  #               alpha = 0.75, size = 1, width = 0) +
+  # geom_errorbarh(data = st_level_dt, aes(x = 10^(avg_dd_p), y = avg_g_p,
+  #                                        xmin = 10^(avg_dd_p - 1.96*se_dd_p), 
+  #                                        xmax = 10^(avg_dd_p + 1.96*se_dd_p),
+  #                                        color = generalist_fac), 
+  #               alpha = 0.75, size = 1, height = 0) +
+  # geom_smooth(method = lm, color = 'black', linetype = 'dashed', se = F) +
+  scale_shape_manual(values = c(16,17)) +
+  scale_color_brewer(type = 'qual', palette = "Dark2") +
+  # scale_color_manual(values = mypal) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(y = "Relative growth\n(orders of magnitude size increase)", x = "Development time (degree days)", 
+       shape = "Paratenic host?", color = "Taxonomic\ndissimilarity") +
+  guides(shape = guide_legend(override.aes = list(size = 4, alpha = 0.25))) +
+  annotate(geom = 'text', label = '(c)', x = min(st_level$avg_dd_paratenic, na.rm=T), y = max(st_level$rel_growth_paratenic, na.rm=T) )
+f7c
+```
+
+We can also take the residuals of the above plot (faster or slower growth than expected) and see if they are related to generalism. They are not.
+
+```{r}
+dx1 <- filter(st_level, !is.na(log_dd), !is.na(rel_growth_biov))
+modx1 <- lm(rel_growth_biov ~ log_dd, data = dx1)
+dx1$res1 <- residuals((modx1))
+
+dx2 <- filter(st_level, !is.na(log_dd_p), !is.na(rel_growth_paratenic))
+modx2 <- lm(rel_growth_paratenic ~ log_dd_p, data = dx2)
+dx2$res2 <- residuals((modx2))
+dx <- left_join(dx2, select(dx1, obs, res1))
+```
+
+```{r}
+ffg <-ggplot(dx, aes(x = res2, y = num_hosts_suspicious_removed)) +
+  geom_point(alpha = 0.3, aes(shape = paratenic)) +
+  geom_smooth(data = filter(dx, paratenic == "no"), method = lm, se = F) +
+  geom_smooth(method = lm, se = F, linetype = "dashed") +
+  scale_y_log10(breaks = c(1, 2, 5, 10, 25, 50, 100)) +
+  theme(panel.grid.minor = element_blank()) +
+  labs(x = "Residuals, Rel Growth vs Log DD", y = "Number of hosts")
+ffg
+# ggsave(ffg, filename = "../../figs/growth_rate_resid_plot.png")
+```
+
+
+
+
+```{r}
+library(cowplot)
+```
+
+```{r}
+f7a2 <- f7a + 
+  guides(size = F, shape = F) +
+  annotate(geom = 'text', label = '(a)', x = min(st_level$rel_growth_paratenic, na.rm=T), y = 104 )
+f7b2 <- f7b + 
+  guides(size = F) +
+  annotate(geom = 'text', label = '(b)', x = min(st_level$avg_dd_paratenic, na.rm=T), y = 104 ) +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        legend.background = element_rect(color = "black"),
+        # legend.direction = "horizontal",
+        legend.position = c(0.85, 0.85)) +
+  guides(shape = guide_legend(override.aes = list(alpha = 1)))
+f7cc2 <- f7cc +
+  guides(size = F) +
+  annotate(geom = 'text', label = '(c)', x = min(st_level$rg_rt, na.rm=T), y = 104 ) +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank())
+```
+```{r}
+# f7_v1 <- plot_grid(f7a2, f7b2,  nrow = 1, align = "hv")
+# f7_v2 <- plot_grid(f7a2, f7b2, f7c, nrow = 1, align = "hv", rel_heights = c(1,1,1.5))
+f7_v3 <- plot_grid(f7a2, f7b2, f7cc2, nrow = 1, align = "hv", axis = "tb")
+```
+```{r}
+fig_width <- 4.5
+fig_height <- 4.5
+
+# ggsave(f7_v1, filename = "../../figs/fig7_rev_v1.png", width = fig_width*2, height = fig_height)
+# ggsave(f7_v2, filename = "../../figs/fig7_rev_v2.png", width = fig_width*3, height = fig_height)
+ggsave(f7_v3, filename = "../../figs/fig6_revHR.png", width = fig_width*3, height = fig_height)
+# ggsave(f7_v3, filename = "../../figs/fig6_revHR.svg", width = fig_width*3, height = fig_height)
+# in svg move figs closer together, put A on top first, then B, then move
+```
+
+
+Do not use this, because trends are weak and it might add confusion.

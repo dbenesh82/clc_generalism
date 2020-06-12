@@ -128,12 +128,36 @@ f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
 f1b
 ```
 
-Let's also make the same figure, but with the predicted values from mixed model controlling for study effort and taxonomy.
+The reviewer was also interested in the "evenness" of host taxonomy, so we can plot that across different life cycle lengths
+
+```{r}
+f1c <- ggplot(filter(dat, num_hosts_lcdb_nhm > 2),
+              aes(y = var.hsi_comb, x = lcl_max_fac)) +
+  geom_boxplot(outlier.color = NA) +
+  geom_point(alpha = 0.2, position = position_jitter(width = 0.3, height = 0), 
+             # color = "tomato1",
+             aes(size = pubs_pubmed_spname_group)) +
+  # scale_y_log10() +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  labs(x = "Life cycle length (max)", y = "Unevenness in host diversity", size = "Pubmed hits") +
+  guides(size = FALSE) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) 
+f1c
+
+# fig_width <- 4
+# fig_height <- 3.5
+# 
+# ggsave(filename = "../figs/Fig2_tax_evenness.png", plot = f1c, device = 'png', units = 'in', 
+#        width = fig_width, height = fig_height) 
+
+```
+
+Let's also make the first two figures, but with the predicted values from mixed model controlling for study effort and taxonomy. I'll fit the model both with `lmer` and `MCMCglmm`, because I want to add confidence intervals to the predicted means. This is easier with a Bayesian approach, but I also bootrstrapped the `lmer` model and it gave quite comparable CIs. The Bayesian approach is also faster, because bootstrapping the model takes a long time.
 
 ```{r}
 library(lme4)
 ```
-
 ```{r}
 regf <- glmer(num_hosts_lcdb_nhm ~ zstudy_effort + lcl_max_fac + 
                 (1|obs) +
@@ -143,14 +167,96 @@ regf <- glmer(num_hosts_lcdb_nhm ~ zstudy_effort + lcl_max_fac +
             family = 'poisson'
             )
 ```
+```{r}
+library(MCMCglmm)
+```
 
 ```{r}
+# make data where we want predicted values
+datx <- dat
+datx$pred <- "no"
 nd <- select(dat, lcl_max_fac)%>%arrange(lcl_max_fac)%>%distinct()
 nd$zstudy_effort <- 0
-
-nd$preds <- exp(predict(regf, newdata = nd, re.form = NA))
-nd$lcl <- 1:4
+nd$parasite_genus <- dat$parasite_genus[1]
+nd$parasite_family <- dat$parasite_family[1]
+nd$parasite_order <- dat$parasite_order[1]
+nd$parasite_class <- dat$parasite_class[1]
+nd$parasite_phylum <- dat$parasite_phylum[1]
+nd$pred <- "yes"
+datx <- bind_rows(datx, nd)
 ```
+
+```{r}
+regfmc <- MCMCglmm(num_hosts_lcdb_nhm ~ zstudy_effort + lcl_max_fac,
+                   random = ~ parasite_genus + parasite_family + parasite_order +
+                     parasite_class + parasite_phylum,
+            data = datx,
+            family = 'poisson',
+            nitt = 100500,
+            thin = 100, burnin = 500
+          )
+```
+
+Compare parameters from two models - basically the same.
+
+```{r}
+summary(regfmc)
+# plot(regfmc$VCV)
+```
+```{r}
+summary(regf)
+```
+
+Get the credible intervals for plotting.
+
+```{r}
+p <- predict.MCMCglmm(regfmc,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+p <- bind_cols(datx, data.frame(exp(p)))
+p <- filter(p, pred == "yes")
+p$lcl <- 1:4
+```
+
+```{r}
+# # bootstrap lmer model - takes a long time
+# nd <- select(dat, lcl_max_fac)%>%arrange(lcl_max_fac)%>%distinct()
+# nd$zstudy_effort <- 0
+# nd$num_hosts_lcdb_nhm <- 0
+# nd$lcl <- 1:4
+# 
+# pd <- model.matrix(terms(regf), nd)
+# 
+# nd$preds <- exp(predict(regf, newdata = nd, re.form = NA))
+# 
+# 
+# # bootstrap model
+# mySumm <- function(.) {
+#     c(beta=fixef(.))
+# }
+# bo <- bootMer(regf, mySumm, nsim = 100) # bootstrap the model
+# bx <- as.data.frame(bo)
+# bx <- select(bx, starts_with('beta'))
+# bx <- as.matrix(bx)
+# 
+# boots <- bx %*% t(pd) # predicted values for every observation for every bootstrap
+# boots <- as.data.frame(t(boots))
+# names(boots) <- as.character(c(1:100))
+# boots <- bind_cols(nd, boots)
+# boots <- pivot_longer(boots, `1`:`100`)
+# 
+# # first get predicted size at each stage for every bootstrap
+# boot_means1 <- boots%>%
+#   group_by(lcl_max_fac)%>%
+#   summarise(med_rg = exp(mean(value)), # mean and CI of the bootstraps
+#             high_rg = exp(quantile(value, probs = 0.975)),
+#             low_rg = exp(quantile(value, probs = 0.025)))
+# nd <- left_join(nd, boot_means1)
+```
+
+
 ```{r}
 f1a2 <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
   geom_boxplot(outlier.color = NA) +
@@ -163,13 +269,22 @@ f1a2 <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank()) +
   annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm)) +
-  geom_line(data = nd, aes(x = lcl, y = preds), 
+  geom_line(data = p, aes(x = lcl, y = fit), 
             alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
-  geom_point(data = nd, aes(x = lcl, y = preds), 
-            size = 5, shape = 23, color = 'black', fill = 'black')
+  geom_linerange(data = p, 
+                  aes(x = lcl, y = fit,
+                      ymin = lwr, ymax = upr), 
+                  size = 1.5, shape = 23, color = 'black', fill = 'black') +
+  geom_point(data = p,
+             aes(x = lcl, y = fit),
+             size = 4,
+             shape = 23, color = 'black', fill = 'black')
 
 f1a2
 ```
+
+
+
 
 ```{r}
 regfx <- lmer(hsi_comb ~ zstudy_effort + lcl_max_fac + 
@@ -178,12 +293,73 @@ regfx <- lmer(hsi_comb ~ zstudy_effort + lcl_max_fac +
             REML=T
             )
 ```
-```{r}
-nd <- select(dat, lcl_max_fac)%>%arrange(lcl_max_fac)%>%distinct()
-nd$zstudy_effort <- 0
 
-nd$preds <- predict(regfx, newdata = nd, re.form = NA)
-nd$lcl <- 1:4
+```{r}
+regfxmc <- MCMCglmm(hsi_comb ~ zstudy_effort + lcl_max_fac,
+                   random = ~ parasite_genus + parasite_family + parasite_order +
+                     parasite_class + parasite_phylum,
+            data = datx,
+            family = 'gaussian',
+            nitt = 50500,
+            thin = 50, burnin = 500
+          )
+```
+
+Compare parameters from two models - basically the same.
+
+```{r}
+summary(regfxmc)
+# plot(regfxmc$VCV)
+```
+```{r}
+summary(regfx)
+```
+
+Get the credible intervals for plotting.
+
+```{r}
+p <- predict.MCMCglmm(regfxmc,
+                      type = "terms",
+                      interval = "confidence",
+                      marginal = ~ parasite_genus + parasite_family + parasite_order +
+                        parasite_class + parasite_phylum)
+p <- bind_cols(datx, data.frame(p))
+p <- filter(p, pred == "yes")
+p$lcl <- 1:4
+```
+
+```{r}
+# nd <- select(dat, lcl_max_fac)%>%arrange(lcl_max_fac)%>%distinct()
+# nd$zstudy_effort <- 0
+# nd$hsi_comb <- 0
+# nd$lcl <- 1:4
+# pd <- model.matrix(terms(regfx), nd)
+# 
+# nd$preds <- predict(regfx, newdata = nd, re.form = NA)
+# 
+# 
+# # bootstrap model
+# mySumm <- function(.) {
+#     c(beta=fixef(.))
+# }
+# bo <- bootMer(regfx, mySumm, nsim = 1000) # bootstrap the model
+# bx <- as.data.frame(bo)
+# bx <- select(bx, starts_with('beta'))
+# bx <- as.matrix(bx)
+# 
+# boots <- bx %*% t(pd) # predicted values for every observation for every bootstrap
+# boots <- as.data.frame(t(boots))
+# names(boots) <- as.character(c(1:1000))
+# boots <- bind_cols(nd, boots)
+# boots <- pivot_longer(boots, `1`:`1000`)
+# 
+# # first get predicted size at each stage for every bootstrap
+# boot_means2 <- boots%>%
+#   group_by(lcl_max_fac)%>%
+#   summarise(med_rg = mean(value), # mean and CI of the bootstraps
+#             high_rg = quantile(value, probs = 0.975),
+#             low_rg = quantile(value, probs = 0.025))
+# nd <- left_join(nd, boot_means2)
 ```
 ```{r}
 f1b2 <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
@@ -199,30 +375,37 @@ f1b2 <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank()) +
   annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb)) +
-  geom_line(data = nd, aes(x = lcl, y = preds), 
+  geom_line(data = p, aes(x = lcl, y = fit), 
             alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
-  geom_point(data = nd, aes(x = lcl, y = preds), 
-            size = 5, shape = 23, color = 'black', fill = 'black')
+  geom_linerange(data = p, 
+                  aes(x = lcl, y = fit,
+                      ymin = lwr, ymax = upr), 
+                  size = 1.5, shape = 23, color = 'black', fill = 'black') +
+  geom_point(data = p,
+             aes(x = lcl, y = fit),
+             size = 4,
+             shape = 23, color = 'black', fill = 'black')
+  # geom_line(data = nd, aes(x = lcl, y = preds), 
+  #           alpha = 1, size = 1.5, color = 'black', linetype = 'dashed') +
+  # geom_pointrange(data = nd, 
+  #                 aes(x = lcl, y = preds,
+  #                     ymin = low_rg, ymax = high_rg), 
+  #           size = 1, shape = 23, color = 'black', fill = 'black')
 
 f1b2
 ```
 
-
-Export the figures with predicted values as SVG and PNG, first Fig 2a...
-
+```{r}
+library(cowplot)
+```
+```{r}
+f1 <- plot_grid(f1a2, f1b2, nrow = 1, align = "h")
+```
 ```{r}
 fig_width <- 4.5
 fig_height <- 4.5
 
-ggsave(filename = "../figs/Fig2a.svg", plot = f1a2, device = 'svg', units = 'in', width = fig_width, height = fig_height)
-ggsave(filename = "../figs/Fig2a.png", plot = f1a2, device = 'png', units = 'in', width = fig_width, height = fig_height)
+ggsave(filename = "../figs/Fig2_comb.png", plot = f1, device = 'png', units = 'in', width = fig_width*2, height = fig_height) 
+ggsave(filename = "../figs/Fig2_comb.svg", plot = f1, device = 'svg', units = 'in', width = fig_width*2, height = fig_height) 
 ```
 
-...then Fig 2b.
-
-```{r}
-ggsave(filename = "../figs/Fig2b.svg", plot = f1b2, device = 'svg', units = 'in', width = fig_width, height = fig_height)
-ggsave(filename = "../figs/Fig2b.png", plot = f1b2, device = 'png', units = 'in', width = fig_width, height = fig_height)
-```
-
-Combine them in Inkscape.
