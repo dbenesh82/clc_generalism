@@ -218,6 +218,19 @@ nhm_red <- select(nhm, Parasite.species, parasite_genus, best_host_name)
 ```
 
 ```{r}
+# # this writes a combined set of genus-level host records for dryad
+# dat_host_red2 <- lcdb_red
+# dat_nhm_red2 <- nhm_red
+# dat_host_red2$source <- 'lcdb'
+# dat_nhm_red2$source <- 'nhm'
+# dat_lcdb_nhm2 <- bind_rows(dat_host_red2, dat_nhm_red2) # combine
+# dat_lcdb_nhm2 <- filter(dat_lcdb_nhm2, parasite_genus %in% lcdb$Parasite.genus)%>%
+#   arrange(Parasite.species, best_host_name)
+# write.csv(dat_lcdb_nhm2, file = "../../data/host_records_genus_level.csv", row.names = F)
+# rm(dat_host_red2, dat_nhm_red2, dat_lcdb_nhm2)
+```
+
+```{r}
 # combine them
 dat_lcdb_nhm <- bind_rows(lcdb_red, nhm_red)%>%distinct()
 ```
@@ -676,3 +689,16 @@ r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
 r2_table
 ```
 
+```{r}
+# # make genus level generalism df for dryad
+# gx <- genus_lev%>%
+#   select(parasite_genus, parasite_family, parasite_order, parasite_class, parasite_phylum,
+#          species_diversity_in_genus = num_sp_lcdb_nhm,
+#          avg_lcl_max,
+#          study_effort = pubs_pubmed,
+#          num_hosts_lcdb_nhm,
+#          hsi_lcdb_nhm = hsi_comb,
+#          var_hsi_lcdb_nhm = var.hsi_comb
+#          )
+# write.csv(gx, file = "genus_level_generalism.csv", row.names = F)
+```

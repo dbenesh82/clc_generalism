@@ -1,7 +1,7 @@
 ---
 title: "Species-level regression for host range"
 author: "Dan Benesh"
-date: "02/04/2020"
+date: "12/06/2020"
 output: github_document
 ---
 
@@ -14,6 +14,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(ape)
+library(RColorBrewer)
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 options(stringsAsFactors = FALSE)
 theme_set(new = theme_bw())
@@ -95,6 +96,17 @@ dat <- mutate(dat, zstudy_effort =
 # dat <- mutate(dat, zstudy_effort = 
 #                 log10(pubs_pubmed_spname_group+1) - quantile(log10(pubs_pubmed_spname_group+1), probs = 0.75) )
 dat$obs <- factor(1:length(dat$Parasite.species)) # observation level effect for quantifying overdispersion
+```
+```{r}
+# # make simplified version of spp-level df for dryad
+# dx <- select(dat, Parasite.species, 
+#              parasite_genus, parasite_family, parasite_order, parasite_class, parasite_phylum,
+#              lcl_max, lcl_min, lcl_max_fac, 
+#              study_effort = pubs_pubmed_spname_group, 
+#              num_hosts_lcdb, num_hosts_lcdb_nhm,
+#              hsi_lcdb, hsi_lcdb_nhm = hsi_comb, 
+#              var_hsi_lcdb = var.hsi_lcdb, var_hsi_lcdb_nhm = var.hsi_comb)
+# write.csv(dx, file = "../../ms_files/AmNat/first_revision/dryad_repo/species_level_generalism.csv", row.names = F)
 ```
 
 ```{r}
@@ -332,7 +344,7 @@ Moving on to hypothesis testing, let's include the observation-level random effe
 
 ### Model building
 
-As a reminder, I fit the following models: (0) intercept-only, with observation-level random effect for residuals, (1) allow taxonomically correlated errors, (2) add study effort, (3) add life cycle length (max), and (4) add life cycle length (min). In step 3, adding life cycle length, I added the term as either a continuous predictor or as a factor. By adding it as a factor, I am looking for evidence of non-linearity, e.g. the difference between one- and two-host cycle parasites is not the same as the difference between two- and three-host cycle parasites.
+As a reminder, I fit the following models: (0) intercept-only, with observation-level random effect for residuals, (1) allow taxonomically correlated errors, (2) add study effort, (3) add life cycle length (max), and (4) add facultative life cycle (equivalent to adding min life cycle length). In step 3, adding life cycle length, I added the term as either a continuous predictor or as a factor. By adding it as a factor, I am looking for evidence of non-linearity, e.g. the difference between one- and two-host cycle parasites is not the same as the difference between two- and three-host cycle parasites.
 
 ```{r}
 # # can re-run GLMER models if needed, e.g to do likelihood ratio tests
@@ -345,11 +357,12 @@ reg1f <- update(reg0f, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|par
 reg2f <- update(reg1f, . ~ . + zstudy_effort) # add study effort
 reg3f <- update(reg2f, . ~ . + lcl_max) # add max life cycle length as covariate
 reg3.1f <- update(reg2f, . ~ . + lcl_max_fac) # add max life cycle length as covariate
-reg4f <- update(reg3.1f, . ~ . + lcl_min) # add min life cycle length
-anova(reg1f, reg2f, reg3f, reg3.1f, reg4f)
+reg4f <- update(reg3.1f, . ~ . + facultative_lc) # add fac life cycle length
+reg5f <- update(reg3.1f, . ~ . + facultative_lc*lcl_max_fac) # add fac x life cycle length
+anova(reg1f, reg2f, reg3f, reg3.1f, reg4f, reg5f)
 ```
 
-These models are nested, so we can compare them with likelihood ratio tests (table above). All model terms added are an improvement, except the minimum life cycle length variable. The best model as judged by AIC is the one treating life cycle length as a categorical variable.
+These models are nested, so we can compare them with likelihood ratio tests (table above). All model terms added are an improvement, except the facultative life cycle terms. The best model as judged by AIC is the one treating life cycle length as a categorical variable.
 
 ```{r}
 lcl_effect <- fixef(reg3f)['lcl_max']
@@ -423,7 +436,7 @@ r2_glmm_tax <- function(model) {
 }
 ```
 ```{r}
-mod_list <- list(reg1f, reg2f, reg3f, reg3.1f, reg4f)
+mod_list <- list(reg1f, reg2f, reg3f, reg3.1f, reg4f, reg5f)
 if(exists("r2_table")){rm(r2_table)}
 i <- 1
 for(model in mod_list){
@@ -438,7 +451,7 @@ for(model in mod_list){
 
 r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
 r2_table$step <- c("taxonomy", "study effort",
-                   "life cycle length", "life cycle length, factor", "facultative life cycle")
+                   "life cycle length", "life cycle length, factor", "facultative life cycle", "facultative x lcl")
 r2_table <- dplyr::select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
 r2_table
 ```
@@ -561,7 +574,8 @@ sya <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
   labs(x = "Taxonomic levels in model", y = "Proportion of variation explained by taxonomy", title = "Species-level, number of host species") +
   theme(panel.grid.minor = element_blank()) +
   guides(color = FALSE) +
-  scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5))
+  scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5)) +
+  scale_color_manual(values = brewer.pal(4, "Set1")[3:4]) 
 sya
 ggsave(sya, filename = "../../figs/FigS9a.svg", device = 'svg', width = 4.5, height = 4.5)
 ```

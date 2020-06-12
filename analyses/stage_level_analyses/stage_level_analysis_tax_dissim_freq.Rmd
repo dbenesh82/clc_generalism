@@ -12,6 +12,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(ape)
+library(RColorBrewer)
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 options(stringsAsFactors = FALSE)
 theme_set(new = theme_bw())
@@ -73,6 +74,24 @@ I add the following factors in order: (1) study effort, (2) whether the stage is
 ```{r}
 hosts_per_stage <- mutate(hosts_per_stage, Host_no_fac = if_else(Host.no > 4, as.integer(4), Host.no))%>%
   mutate(Host_no_fac = factor(Host_no_fac))
+```
+
+```{r}
+# # write simple data table for dryad
+# hx <- hosts_per_stage%>%
+#   filter(Facultative != 'postcyclic')%>%
+#   rename(stage_length_end = stage_body_length, stage_biov_end = stage_biov)%>%
+#   mutate(stage_length_start = stage_length_end - abs_growth_len,
+#          stage_biov_start = stage_biov_end - abs_growth_biov)%>%
+#   mutate(rg = log(stage_biov_end) - log(stage_biov_start))%>%
+#   select(Parasite.species, parasite_genus, parasite_family, parasite_order, parasite_class, parasite_phylum,
+#          Host_number = Host.no, Host_num_fac = Host_no_fac, Def.int, Facultative, 
+#          lcl_max, lcl_min, lcl_max_fac, partial_cycle,
+#          study_effort,
+#          num_hosts_lcdb = num_hosts_suspicious_removed, 
+#          hsi_lcdb = hsi_lcdb_suspcious_rem, var_hsi_lcdb = var.hsi_lcdb_suspcious_rem,
+#          biov = stage_biov_end, dt = avg_dt, dd = avg_dd, rel_growth = rg )
+# write.csv(hx, file = "../../ms_files/AmNat/first_revision/dryad_repo/stage_level_generalism.csv", row.names = F)
 ```
 
 Here are a few stats reported in the tables of the manuscript. How many species were in this analysis?
@@ -509,6 +528,7 @@ syd <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
   labs(x = "Taxonomic levels in model", y = "Proportion of variation explained by taxonomy",
        color = NULL, title = "Stage-level, taxonomic dissimilarity") +
   scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5)) +
+  scale_color_manual(values = brewer.pal(4, "Set1")[3:4]) +
   theme(legend.position = c(0.98, 0.02),
         legend.justification = c(1,0),
         legend.background = element_rect(color = 'black'),

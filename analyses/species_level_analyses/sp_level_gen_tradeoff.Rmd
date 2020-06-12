@@ -1,7 +1,7 @@
 ---
 title: "Cross-stage tradeoffs"
 author: "Dan Benesh"
-date: "21/01/2020"
+date: "12/06/2020"
 output: github_document
 ---
 
@@ -57,6 +57,7 @@ stage_avg <- filter(stage_avg, partial_cycle != 'partial') # just complete life 
 ```
 ```{r}
 stage_avg$obs <- 1:length(stage_avg$Parasite.species)
+stage_avg <- mutate(stage_avg, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "not facultative"))
 ```
 
 Number of species:
@@ -124,7 +125,7 @@ reg1f <- lmer(log(hr) ~ 1 + (1|parasite_genus) + (1|parasite_family) + (1|parasi
 reg2f <- update(reg1f, . ~ . + zstudy_effort) # add study effort
 reg3f <- update(reg2f, . ~ . + lcl_max) # add max life cycle length as covariate
 reg3.1f <- update(reg2f, . ~ . + lcl_max_fac) # add max life cycle length as covariate
-reg4f <- update(reg3.1f, . ~ . + lcl_min) # distinguish fac life cycles
+reg4f <- update(reg3.1f, . ~ . + facultative_lc) # distinguish fac life cycles
 anova(reg1f, reg2f, reg3f, reg3.1f, reg4f)
 ```
 
@@ -151,7 +152,7 @@ reg1p <- update(reg0p, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|par
 reg2p <- update(reg1p, . ~ . + zstudy_effort) # add study effort
 reg3p <- update(reg2p, . ~ . + lcl_max) # add max life cycle length as covariate
 reg3.1p <- update(reg2p, . ~ . + lcl_max_fac) # add max life cycle length as covariate
-reg4p <- update(reg3.1p, . ~ . + lcl_min) # distinguish fac life cycles
+reg4p <- update(reg3.1p, . ~ . + facultative_lc) # distinguish fac life cycles
 anova(reg1p, reg2p, reg3p, reg3.1p, reg4p)
 ```
 
@@ -220,7 +221,7 @@ reg1f <- lmer(hsi ~ 1 + (1|parasite_genus) + (1|parasite_family) + (1|parasite_o
 reg2f <- update(reg1f, . ~ . + zstudy_effort) # add study effort
 reg3f <- update(reg2f, . ~ . + lcl_max) # add max life cycle length as covariate
 reg3.1f <- update(reg2f, . ~ . + lcl_max_fac) # add max life cycle length as covariate
-reg4f <- update(reg3.1f, . ~ . + lcl_min) # distinguish fac life cycles
+reg4f <- update(reg3.1f, . ~ . + facultative_lc) # distinguish fac life cycles
 anova(reg1f, reg2f, reg3f, reg3.1f, reg4f)
 ```
 

@@ -185,6 +185,15 @@ ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = rel_growth_biov, color = De
   labs(y = "Tax dissimilarity index", x = "Relative growth", title = "Stage level")
 ```
 
+```{r}
+ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = rel_growth_biov)) +
+  # scale_x_log10() +
+  # scale_y_log10() +
+  geom_point(alpha = 0.2) +
+  geom_smooth(method = 'lm', se = F) +
+  labs(y = "Tax dissimilarity index", x = "Relative growth", title = "Stage level")
+```
+
 There are a number of species in the database that infect paratenic hosts. In paratenic hosts, it is usually assumed that the parasite undergoes little to no growth. Consequently, their size in paratenic hosts is often not reported - it is implicitly assumed that little to no growth occurs. Indeed, over 50% of paratenic stages in the database lack sizes compared to only 20% of obligate stages.
 
 ```{r}
@@ -214,6 +223,16 @@ ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = rel_growth_paratenic, color
   labs(y = "Tax dissimilarity index", x = "Relative growth, paratenics added", title = "Stage level")
 ```
 
+```{r}
+ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = rel_growth_paratenic)) +
+  # scale_x_log10() +
+  # scale_y_log10() +
+  geom_point(aes(shape = Facultative), alpha = 0.2) +
+  # geom_smooth(se = F) +
+  geom_smooth(se = F, method = 'lm') +
+  labs(y = "Tax dissimilarity index", x = "Relative growth, paratenics added", title = "Stage level")
+```
+
 It looks like specificity and growth are linked. Parasites grow less when they are more generalist at a given stage. What about developmental time? Is there a tradeoff between generalism and development?
 
 It does not look like it. Stages with long development times are as generalist as those with short development times.
@@ -234,6 +253,14 @@ ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = avg_dd, color = Def.int)) +
   geom_smooth(se = F, method = lm) +
   labs(y = "Tax dissim index", x = "Devo time, degree days", title = "Stage level")
 ```
+```{r}
+ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = avg_dd)) +
+  scale_x_log10() + 
+  # scale_y_log10() +
+  geom_point(alpha = 0.2) +
+  geom_smooth(se = F, method = lm) +
+  labs(y = "Tax dissim index", x = "Devo time, degree days", title = "Stage level")
+```
 
 In paratenic hosts, parasites are assumed to undergo no development. This was implicitly assumed in many papers used to construct the life cycle database. Let's assume that in paratenic hosts, parasites require a day at room temperature to become infective to the next host. When we replot the data, we see that these species in paratenic hosts (left side) tend to have higher generalism.
 
@@ -245,9 +272,19 @@ ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = avg_dd_paratenic, color = D
   scale_x_log10() + 
   #scale_y_log10() +
   geom_point(aes(shape = Facultative), alpha = 0.2) +
-  geom_smooth(se = F) +
+  geom_smooth(method = lm, se = F) +
   labs(y = "Tax dissim index", x = "Devo time, degree days\nparatenic added", title = "Stage level")
 ```
+```{r}
+ggplot(st_level, aes(y = hsi_lcdb_suspcious_rem, x = avg_dd_paratenic)) +
+  scale_x_log10() + 
+  #scale_y_log10() +
+  geom_point(aes(shape = Facultative), alpha = 0.2) +
+  geom_smooth(se = F) +
+  geom_smooth(method = lm, se = F) +
+  labs(y = "Tax dissim index", x = "Devo time, degree days\nparatenic added", title = "Stage level")
+```
+
 
 Here's another way to look at it. Parasites are generalists when infecting paratenic intermediate hosts.
 

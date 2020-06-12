@@ -28,7 +28,7 @@ Parasites may be generalists at the species level even when specializing at the 
 
 Are the trends we see across stages expected? These worms are transmitted trophically, i.e. one host is eaten by the next host, so we derived expectations by simulating parasite life cycles in real food webs. Our goal was see how well encounter-driven life cycles mimicked actual cycles. [These simulations](analyses/transmission_opportunity_foodwebs/quantifying_trans_opportunity_revised.md) recreated at least one notable feature of the data - a peak in generalism after one or two life cycles steps. This can be seen in the next plot, which has expected generalism overlaid on observed generalism; the expectations were color coded by whether a simulated cycle started in many or few of the available first hosts. Simulated cycles usually had higher generalism that observed ones.
 
-![](figs/FigS7.png)
+![](figs/Fig3_comb_edit.png)
 
 Our analysis demonstrates how food webs determine potential host ranges and it suggests that realized ranges are smaller and thus presumably shaped by additional things besides just trophic ecology, such as tradeoffs that favor specialization. 
 
@@ -36,7 +36,7 @@ Our analysis demonstrates how food webs determine potential host ranges and it s
 
 At the parasite stage level, we assessed tradeoffs between generalism and two life history traits, growth and development time. The analyses are [here](analyses/tradeoffs_w_growth/growth_TO_host_range.md) and [here](analyses/tradeoffs_w_growth/growth_TO_tax_dissim.md). We found that parasite stages that spend less time developing and grow less in their host tended to infect a more taxonomically broad set of hosts. This is consistent with a tradeoff between generalism and parasite growth. 
 
-![](figs/Fig7_comb.png)
+![](figs/fig6_rev_edit.png)
 
 # Conclusions
 

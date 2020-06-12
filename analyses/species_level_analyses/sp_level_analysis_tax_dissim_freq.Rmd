@@ -1,7 +1,7 @@
 ---
 title: "Species-level regression for taxonomic dissimilarity"
 author: "Dan Benesh"
-date: "02/04/2020"
+date: "12/06/2020"
 output: github_document
 ---
 
@@ -14,6 +14,7 @@ library(ggplot2)
 library(dplyr)
 library(tidyr)
 library(ape)
+library(RColorBrewer)
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 options(stringsAsFactors = FALSE)
 theme_set(new = theme_bw())
@@ -287,7 +288,11 @@ Overall, the three tested model types are similar. Therefore, I would opt for th
 
 ## Hypothesis testing
 
-As a reminder, I fit the following models: (0) intercept-only, with observation-level random effect for residuals, (1) allow taxonomically correlated errors, (2) add study effort, (3) add life cycle length (max), and (4) add life cycle length (min). In step 3, adding life cycle length, I added the term as either a continuous predictor or as a factor.
+As a reminder, I fit the following models: (0) intercept-only, with observation-level random effect for residuals, (1) allow taxonomically correlated errors, (2) add study effort, (3) add life cycle length (max), and (4) add whether cycle is facultative (equivalent to adding min life cycle length). In step 3, adding life cycle length, I added the term as either a continuous predictor or as a factor.
+
+```{r}
+names()
+```
 
 ```{r}
 reg1 <- lmer(hsi_comb ~ 1 + (1|parasite_genus) + (1|parasite_family) + 
@@ -297,10 +302,11 @@ reg1 <- lmer(hsi_comb ~ 1 + (1|parasite_genus) + (1|parasite_family) +
 reg2 <- update(reg1, . ~ . + log10(pubs_pubmed_spname_group+1)) # add study effort
 reg3 <- update(reg2, . ~ . + lcl_max) # add max life cycle length as covariate
 reg3.1 <- update(reg2, . ~ . + lcl_max_fac) # add max life cycle length as covariate
-reg4 <- update(reg3.1, . ~ . + lcl_min) # add min life cycle length
+reg4 <- update(reg3.1, . ~ . + facultative_lc) # add min life cycle length
+reg5 <- update(reg4, . ~ . + facultative_lc*lcl_max_fac) # add min life cycle length
 ```
 ```{r}
-anova(reg1, reg2, reg3, reg3.1, reg4)
+anova(reg1, reg2, reg3, reg3.1, reg4, reg5)
 ```
 
 These models are nested, so we can compare them with likelihood ratio tests (table above). Adding study effort is not an improvement, but adding life cycle length, particularly as a factor, is a major improvement. Splitting out the facultative species was not an improvement. The best model as judged by AIC is the one treating life cycle length as a categorical variable.
@@ -352,7 +358,7 @@ r2_lmm_tax <- function(model) {
 }
 ```
 ```{r}
-mod_list <- list(reg1, reg2, reg3, reg3.1, reg4)
+mod_list <- list(reg1, reg2, reg3, reg3.1, reg4, reg5)
 if(exists("r2_table")){rm(r2_table)}
 i <- 1
 for(model in mod_list){
@@ -366,7 +372,7 @@ for(model in mod_list){
 
 r2_table <- mutate(r2_table, tax_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
 r2_table$step <- c("taxonomy", "study effort", 
-                   "life cycle length", "life cycle length, factor", "facultative life cycle")
+                   "life cycle length", "life cycle length, factor", "facultative life cycle", "facultative x lcl")
 r2_table <- dplyr::select(r2_table, step, df_used, marg_r2, cond_r2, tax_var_explained)
 r2_table
 ```
@@ -383,7 +389,7 @@ reg1t <- lmer(hsi_comb ~ 1 + (1|parasite_genus) + (1|parasite_family) +
 reg2t <- update(reg1t, . ~ . + log10(pubs_pubmed_spname_group+1)) # add study effort
 reg3t <- update(reg2t, . ~ . + lcl_max) # add max life cycle length as covariate
 reg3.1t <- update(reg2t, . ~ . + lcl_max_fac) # add max life cycle length as covariate
-reg4t <- update(reg3.1t, . ~ . + lcl_min) # add min life cycle length
+reg4t <- update(reg3.1t, . ~ . + facultative_lc) # add fac lc
 ```
 ```{r}
 mod_list <- list(reg1t, reg2t, reg3t, reg3.1t, reg4t)
@@ -515,10 +521,11 @@ syb <- ggplot(r2_tax, aes(x = levels, y = tax_var_explained, color = approach)) 
   labs(x = "Taxonomic levels in model", y = "Proportion of variation explained by taxonomy", title = "Species-level, taxonomic dissimilarity") +
   theme(panel.grid.minor = element_blank()) +
   guides(color = FALSE) +
-  scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5))
+  scale_x_continuous(expand = expand_scale(mult = 0, add = 0.5)) +
+  scale_color_manual(values = brewer.pal(4, "Set1")[3:4]) 
 syb
 # ggsave(syb, filename = "../../figs/FigS9b.png", device = 'png', width = 4.5, height = 4.5)
-ggsave(syb, filename = "../../figs/FigS9b.svg", device = 'svg', width = 4.5, height = 4.5)
+# ggsave(syb, filename = "../../figs/FigS9b.svg", device = 'svg', width = 4.5, height = 4.5)
 ```
 
 Let's look more closely at families, because with genera, there are quite a few with just one or two species, such that the random effect estimate are imprecise. We'll take the random effect estimates for parasite family from the model accounting for study effort and life cycle length. Then, we'll sort them to see which families rank high (generalists) or low (specialists). 

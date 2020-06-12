@@ -50,7 +50,8 @@ Growth was less commonly reported in paratenic hosts, so I made some assumptions
 st_level <- mutate(st_level, rel_growth_paratenic = if_else(Facultative == "paratenic" & is.na(rel_growth_biov), 0, rel_growth_biov)) # if paratenic, then dt = 0
 ```
 ```{r}
-st_level <- mutate(st_level, avg_dd_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dd), 20, avg_dd)) # if paratenic, then dt = 0
+st_level <- mutate(st_level, avg_dd_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dd), 20, avg_dd),
+                   avg_dt_paratenic = if_else(Facultative == "paratenic" & is.na(avg_dt), 1, avg_dt)) # if paratenic, then dt = 0
 ```
 ```{r}
 st_level <- mutate(st_level, rel_growth_rate_dt = rel_growth_biov/avg_dt, rel_growth_rate_dd = rel_growth_biov/avg_dd) # make growth rate variable
@@ -220,9 +221,99 @@ reg2 <- update(reg1, . ~ . + rel_growth_paratenic) # add rel growth
 anova(reg0, reg1, reg2)
 ```
 
-#### Development time
+#### Development time - days
 
-Moving on to development time. Short development times were associated with higher generalism, which is consistent with a tradeoff.
+Moving on to development time expressed as days to maturity. There is not a clear relationship between host range and developmental time.
+
+```{r}
+reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),
+             data = filter(st_level, !is.na(avg_dt)),
+             family = 'poisson') # just w/in species effect
+
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + log10(avg_dt)) # add devo
+anova(reg00, reg0, reg1, reg2)
+```
+
+Here's the model output.
+```{r}
+summary(reg2)
+```
+
+Little variation was explained by development time.
+
+```{r}
+b0 <- fixef(reg0)
+varD <- log(1 + 1/exp(b0)) # distribution specific variance
+rm(b0)
+
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_glmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_glmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo time")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained)
+r2_table
+```
+
+If we assume development in paratenic hosts is short (1 day), then the relationship is significant.
+
+```{r}
+reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),
+             data = filter(st_level, !is.na(avg_dt_paratenic)),
+             family = 'poisson') # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + log10(avg_dt_paratenic)) # add devo
+anova(reg00, reg0, reg1, reg2)
+```
+
+Here's the model output.
+
+```{r}
+summary(reg2)
+```
+
+The effect size is still small, though, explaining less than 1% of the variation.
+
+```{r}
+b0 <- fixef(reg0)
+varD <- log(1 + 1/exp(b0)) # distribution specific variance
+rm(b0)
+
+mod_list <- list(reg00, reg0, reg1, reg2)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_glmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_glmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo time")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained)
+r2_table
+```
+
+#### Development time - degree days
+
+Moving on to development time expressed in temp-corrected degree days. Short development times were associated with higher generalism, which is consistent with a tradeoff.
 
 ```{r}
 reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),
@@ -261,7 +352,7 @@ for(model in mod_list){
 
 
 r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
-r2_table$step <- c("within-species corr", "taxonomy", "study effort", "growth")
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo time")
 r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained)
 r2_table
 ```
@@ -305,23 +396,42 @@ for(model in mod_list){
 
 
 r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
-r2_table$step <- c("within-species corr", "taxonomy", "study effort", "growth")
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "devo time")
 r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained)
 r2_table
 ```
 
 #### Relative growth rate
 
-Now, we look at growth rate, which combines the effects of growth and development. It is important to keep in mind that the sample size is smaller when considering development and growth simultaneously (some stages with growth data lack development data and vice versa). Adding relative growth rate weakly improves the model.
+```{r}
+st_level <- mutate(st_level, 
+                   # relative growth rate
+                   rg = log(stage_biov_end) - log(stage_biov_start),
+                   rg_dt = (log(stage_biov_end) - log(stage_biov_start))/avg_dt,
+                   #rg_dt2 = (log10(stage_biov_end) - log10(stage_biov_start))/avg_dt, # perfectly correlates with rgr with ln
+                   rg_dd = (log(stage_biov_end) - log(stage_biov_start))/avg_dd,
+                   rg_rt = (log(stage_biov_end) - log(stage_biov_start))/(avg_dd/15))%>%
+  # percent change in size per unit time
+  mutate(rg_dt_perc = exp(rg_dt)-1, 
+         rg_dd_perc = exp(rg_dd)-1,
+         rg_rt_perc = exp(rg_rt)-1)%>% 
+  # doubling times
+  mutate(doubling_time_days = log(2)/rg_dt_perc,
+         doubling_time_days_rt = log(2)/rg_rt_perc)
+```
+
+Now, we look at growth rate, which combines the effects of growth and development. It is important to keep in mind that the sample size is smaller when considering development and growth simultaneously (some stages with growth data lack development data and vice versa). There are different ways of measuring growth rate. Here I use this formula for relative growth rate (rgr): (ln end size - ln starting size) / time. For modeling, it does not matter if we use log10 or ln, because the resulting rgrs are perfectly correlated. Interpretation of rgr is easier with natural logs, though, as it approximates the exponential growth rate (i.e. the % change per unit time), but only for lower growth rates.
+
+Adding relative growth rate weakly improves the model.
 
 ```{r}
 reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),
-             data = filter(st_level, !is.na(rel_growth_rate_dd)),
+             data = filter(st_level, !is.na(rg_dd)),
              family = 'poisson') # just w/in species effect
 
 reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
 reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
-reg2 <- update(reg1, . ~ . + rel_growth_rate_dd) # add devo
+reg2 <- update(reg1, . ~ . + rg_dd) # add devo
 anova(reg00, reg0, reg1, reg2)
 ```
 
@@ -352,7 +462,7 @@ for(model in mod_list){
 
 
 r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
-r2_table$step <- c("within-species corr", "taxonomy", "study effort", "growth")
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "growth rate")
 r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained)
 r2_table
 ```
@@ -396,7 +506,7 @@ for(model in mod_list){
 
 
 r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
-r2_table$step <- c("within-species corr", "taxonomy", "study effort", "growth")
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "growth rate")
 r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained)
 r2_table
 ```
@@ -461,21 +571,20 @@ reg5 <- update(reg4, . ~ . + rel_growth_paratenic) # add stage level growth
 anova(reg00, reg0, reg1, reg4, reg5)
 ```
 
+#### Development time - days
 
-#### Development time
-
-On the other hand, adding development time to a model with life cycle characteristics is a slight improvement.
+Adding development time in days to a model with life cycle characteristics is not an improvement.
 
 ```{r}
 reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),
-             data = filter(st_level, !is.na(avg_dd)),
+             data = filter(st_level, !is.na(avg_dt)),
              family = 'poisson') # just w/in species effect
 reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
 reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
 reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
 reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
 reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
-reg5 <- update(reg4, . ~ . + log10(avg_dd)) # add stage level growth
+reg5 <- update(reg4, . ~ . + log10(avg_dt)) # add stage level growth
 
 anova(reg00, reg0, reg1, reg4, reg5)
 ```
@@ -503,7 +612,67 @@ r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained
 r2_table
 ```
 
-When we assume development does not occur in paratenic hosts, the results change slightly. Specifically, life cycle characteristics become more important, i.e. being a second or third intermediate hosts, but developmental time still does not explain additional variation beyond that explained by the life cycle.
+When we assume development does not occur in paratenic hosts, the results are similar. Developmental time does not explain additional variation in host range beyond that explained by the life cycle.
+
+```{r}
+reg0 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species) + (1|parasite_genus) + 
+                (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum),
+             data = filter(st_level, !is.na(avg_dt_paratenic)),
+             family = 'poisson') # just w/in species effect
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + log10(avg_dt_paratenic)) # add stage level growth
+
+anova(reg0, reg1, reg4, reg5)
+```
+
+#### Development time - degree days
+
+On the other hand, adding development time in degree days to a model with life cycle characteristics is a marginal improvement.
+
+```{r}
+reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),
+             data = filter(st_level, !is.na(avg_dd)),
+             family = 'poisson') # just w/in species effect
+reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
+reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
+reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
+reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
+reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
+reg5 <- update(reg4, . ~ . + log10(avg_dd)) # add stage level growth
+
+anova(reg00, reg0, reg1, reg4, reg5)
+```
+
+But it explained little variation in host range.
+
+```{r}
+b0 <- fixef(reg0)
+varD <- log(1 + 1/exp(b0)) # distribution specific variance
+rm(b0)
+
+mod_list <- list(reg00, reg0, reg1, reg2, reg3, reg4, reg5)
+if(exists("r2_table")){rm(r2_table)}
+i <- 1
+for(model in mod_list){
+  if(i == 1){
+    r2_table <- r2_glmm_tax(model)
+  } else {
+    r2_table <- rbind(r2_table, r2_glmm_tax(model))
+  }
+  i <- i + 1
+}
+
+
+r2_table <- mutate(r2_table, rand_var_explained = cond_r2 - marg_r2, df_used = df - lag(df))
+r2_table$step <- c("within-species corr", "taxonomy", "study effort", "stage function", "host number", "host x stage", "devo")
+r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained)
+r2_table
+```
+
+When we assume development does not occur in paratenic hosts, the results change slightly. Specifically, life cycle characteristics become more important, i.e. being a second or third intermediate hosts, but developmental time still does not explain additional variation in host range beyond that explained by the life cycle.
 
 ```{r}
 reg0 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species) + (1|parasite_genus) + 
@@ -526,17 +695,19 @@ Again, the relation between relative growth rate and host range is marginal, but
 
 ```{r}
 reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),
-             data = filter(st_level, !is.na(rel_growth_rate_dd)),
+             data = filter(st_level, !is.na(rg_dd)),
              family = 'poisson') # just w/in species effect
 reg0 <- update(reg00, . ~ . + (1|parasite_genus) + (1|parasite_family) + (1|parasite_order) + (1|parasite_class) + (1|parasite_phylum))
 reg1 <- update(reg0, . ~ . + zstudy_effort) # add study effort (species level predictor)
 reg2 <- update(reg1, . ~ . + Def.int) # distinguish adults and larvae
 reg3 <- update(reg2, . ~ . + Host_no_fac) # distinguish worms in 1st, 2nd host, etc.
 reg4 <- update(reg3, . ~ . + Host_no_fac*Def.int) # distinguish adults in 1st, 2nd host from larvae in 1st, 2nd host, etc.
-reg5 <- update(reg4, . ~ . + rel_growth_rate_dd) # add stage level growth
+reg5 <- update(reg4, . ~ . + rg_dd) # add stage level growth
 
 anova(reg00, reg0, reg1, reg4, reg5)
 ```
+
+The effect of relative growth rate is weak, explaining <1% of the variation
 
 ```{r}
 b0 <- fixef(reg0)
@@ -562,7 +733,7 @@ r2_table <- select(r2_table, step, df_used, marg_r2, cond_r2, rand_var_explained
 r2_table
 ```
 
-Check whether this changes after imputing data for paratenic stages. The effect of parasite growth rate is marginally significant. Stage info must explain that imputed variation.
+The marginally significant effect of growth rate remains after imputing data for paratenic stages, though it is debatable whether this makes sense, since imputed growth rates are usually zero.
 
 ```{r}
 reg00 <- glmer(num_hosts_suspicious_removed ~ 1 + (1|obs) + (1|Parasite.species),

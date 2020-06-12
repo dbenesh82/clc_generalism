@@ -15,7 +15,7 @@ In this notebook, I explore the data returned by the NHM database. I look at its
 library(ggplot2)
 library(dplyr)
 library(tidyr)
-library(helminthR)
+# library(helminthR)
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 options(stringsAsFactors = FALSE)
 theme_set(new = theme_bw())
@@ -216,9 +216,21 @@ Then I combine the host records from LCDB with those from NHM and again calculat
 
 ```{r}
 dat_host_red <- filter(dat_host, !is.na(Host.species), !is.na(Host.common.name))%>%
-  select(Parasite.species, best_host_name)
-dat_nhm_red <- select(dat_nhm, Parasite.species, best_host_name)
+  select(Parasite.species, Host.species, best_host_name)
+dat_nhm_red <- select(dat_nhm, Parasite.species, Host.species, best_host_name)
 ```
+```{r}
+# this writes a combined set of host records for dryad
+dat_host_red2 <- dat_host_red
+dat_nhm_red2 <- dat_nhm_red
+dat_host_red2$source <- 'lcdb'
+dat_nhm_red2$source <- 'nhm'
+dat_lcdb_nhm2 <- bind_rows(dat_host_red2, dat_nhm_red2) # combine 
+dat_lcdb_nhm2 <- arrange(dat_lcdb_nhm2, Parasite.species, best_host_name)
+# write.csv(dat_lcdb_nhm2, file = "../../data/host_records_lcdb_nhm_combined.csv", row.names = F)
+rm(dat_host_red2, dat_nhm_red2, dat_lcdb_nhm2)
+```
+
 ```{r}
 # combine them
 dat_lcdb_nhm <- bind_rows(dat_host_red, dat_nhm_red)%>%distinct() # using corrected instead of uncorrected host names elminates about 2000 unique host-parasite combos

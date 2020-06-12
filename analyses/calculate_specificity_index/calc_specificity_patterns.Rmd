@@ -22,6 +22,8 @@ lcdb <- read.csv(file="../../data/CLC_database_updated_names.csv", header = TRUE
 nhm <- read.csv(file="../../data/NHM_db_hosts_updated_names.csv", header = TRUE, sep=",")
 # load host taxonomy
 host.tax <- read.csv(file="../../data/ncbi_host_taxonomy.csv", header = TRUE, sep=",") # taxonomy from NCBI
+# some host taxonomy was missing for ~180 spp in LCDB, so I manually filled it
+not_ncbi_tax <- read.csv(file = "../../data/host_tax_manually_filled.csv", header = TRUE)
 ```
 ```{r}
 lcdb$db <- 'lcdb'
@@ -33,10 +35,14 @@ lcdb_nhm_records <- bind_rows(select(lcdb, Parasite.species, Host.species, best_
 ```
 
 I add the downloaded NCBI taxonomy to the host records.
-
+```{r}
+# make a single host tax ds
+host.tax2 <- select(host.tax, sp.query, genus, family, order, class, phylum)
+host.tax2 <- bind_rows(host.tax2, select(not_ncbi_tax, sp.query = binomial, genus, family, order, class, phylum))%>%distinct()
+```
 ```{r, message=FALSE, warning=FALSE}
 dataH <- left_join(lcdb_nhm_records, 
-                   select(host.tax, sp.query, genus, family, order, class, phylum)%>%distinct(),
+                   select(host.tax2, sp.query, genus, family, order, class, phylum)%>%distinct(),
                    by = c("best_host_name" = "sp.query"))
 ```
 
@@ -94,6 +100,19 @@ We want to calculate the host specificity index twice, once for just the lcdb an
 phy_hs_lcdb <- filter(phy.hs, db == 'lcdb')
 phy_hs_comb <- select(phy.hs, -db)%>%distinct()
 phy_hs_comb <- filter(phy_hs_comb, Parasite.species %in% lcdb$Parasite.species) # remove parasite species in nhm but not lcdb
+```
+```{r}
+# # simple df of host taxonomy output for Dryad 
+# tax_out <- select(dataH, Host.species, best_host_name, 
+#                  genus, family, order, class, phylum)%>%
+#   filter(!is.na(genus) , !is.na(family) , !is.na(order) , !is.na(class) , !is.na(phylum))%>%
+#   arrange(best_host_name)%>%
+#   distinct()
+# 
+# write.csv(tax_out, 
+#           file = "../../ms_files/AmNat/first_revision/dryad_repo/host_records_taxonomy/host_taxonomy.csv",
+#           row.names = F)
+# rm(tax_out)
 ```
 
 We load a couple functions from an external file for calculating the taxonomic specificity index.

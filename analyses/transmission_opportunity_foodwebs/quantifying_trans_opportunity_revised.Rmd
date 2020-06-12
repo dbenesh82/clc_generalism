@@ -38,6 +38,33 @@ They were generated from this many food webs:
 n_distinct(filter(chains3_l, hosts != 0, web_study %in% webs_with_verts)$fw)
 ```
 
+```{r}
+# # simple df for dryad
+# # sort simulated cycles by fw
+# hx <- chains3_l%>%
+#   ungroup()%>%
+#   filter(web_study %in% webs_with_verts)%>%
+#   arrange(web_study, fw, first_hosts, index)
+# 
+# # reassign index numbers of simulated cycles
+# i <- rep(seq(1, length(unique(hx$index))), times = 4)
+# hx$index_o <- (sort(i))
+# hx <- select(hx, -index)%>%
+#   rename(index = index_o)
+# 
+# # rename var
+# hx <- hx%>%
+#   select(study = web_study, fw_name = fw, index, 
+#          step_in_cycle = steps, 
+#          primary_consumers_as_first_host = first_hosts,
+#          max_primary_consumers = max_prim_consumers,
+#          prop_potential_first_hosts = prop_pot_first_hosts,
+#          num_hosts = hosts, cum_hosts, 
+#          hsi, cum_hsi)
+# 
+# write.csv(hx, file = "generalism_in_simulated_life_cycles.csv", row.names = F)
+# rm(hx)
+```
 
 ## Stage-level generalism
 
@@ -47,9 +74,10 @@ After giving parasites random starting points (first hosts), how many hosts will
 ```{r}
 most_relevant_studies2 <- c("Cohen et al. (2009)", "Ekloef et al. (2013)", 
                         "Jacob et al. (2011)", "Jacob et al. (2015)", "Zander et al. (2011)", 
-                        "Mouritsen et al. (2011)", "Thieltges et al. (2011)", "Preston et al. (2012)", "Hechinger et al. (2011)") #"Zander et al. (2011)"
-
+                        "Mouritsen et al. (2011)", "Thieltges et al. (2011)", "Preston et al. (2012)", "Lafferty et al. (2006)")
+# "Hechinger et al. (2011)") "Zander et al. (2011)"
 ```
+
 ```{r}
 ggplot(filter(chains3_l, web_study %in% most_relevant_studies2),
        aes(x = step_int, y = hosts, color = prop_pot_first_hosts)) +
@@ -69,8 +97,9 @@ figsx <- ggplot(filter(chains3_l, hosts != 0, web_study %in% most_relevant_studi
   geom_line(aes(group = index), alpha = 0.2) +
   facet_wrap(~web_study, scales = 'free_y') +
   labs(x = "Sequential predation events (host in cycle)", y = "Potential hosts", 
-       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
-  scale_color_distiller(type = 'div', palette = 'RdBu') +
+       color = "Primary\nconsumers\nas first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu', 
+                        breaks = c(0.01, 0.25, 0.50, 0.75, 1.0)) +
   theme(panel.grid.minor = element_blank(), 
         legend.title = element_text(size = 8),
         strip.text = element_text(size = 6))
@@ -89,7 +118,8 @@ ggplot(filter(chains3_l, hosts != 0, web_study %in% most_relevant_studies2),
   facet_wrap(~web_study) +
   scale_color_distiller(type = 'div', palette = 'RdBu') +
   theme(panel.grid.minor = element_blank()) +
-  labs(x = "Sequential predation events (host in cycle)", y = "Proportion of encountered hosts", color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
+  labs(x = "Sequential predation events (host in cycle)", y = "Proportion of encountered hosts", 
+       color = "Primary\nconsumers\nas first hosts")
 ```
 
 Now, let's try to model this relationship to get quantitative expectations. Potential host range changes non-linearly with transmission events, i.e. host range does not uniformly increase or decrease with more transmission events. Therefore, let's treat predation/transmission steps as a factor and see how its effect changes depending on the number of first hosts. We'll fit a mixed model accounting for study and food web. The plot above suggests that one predation step may have a different impact in different food webs, so I allowed the effect of this factor to vary by study. The model has Poisson errors, as that led to a much better residual plot than normally distributed errors.
@@ -129,6 +159,10 @@ t1 <- glmer(hosts ~ steps * prop_pot_first_hosts + (1|index) + (steps+0|web_stud
             control=glmerControl(optimizer = "nloptwrap")
            )
 ```
+```{r}
+# SAVE!!
+```
+
 
 And here are the parameters from the better model:
 
@@ -208,7 +242,8 @@ f2u <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5)
   scale_y_log10(limits = c(0.95,104), breaks = c(1, 5, 10, 25, 50, 100)) +
   scale_color_distiller(type = 'div', palette = 'RdBu') +
   scale_fill_brewer(type = "qual", palette = "Set2") +
-  labs(x = "Stage (host) in life cycle", y = "Host records", color = "Proportion\nfirst hosts") +
+  labs(x = "Stage (host) in life cycle", y = "Host records", 
+       color = "Primary\nconsumers\nas first hosts") +
   theme(
         # legend.position = c(1,1),
         # legend.justification = c(1,1),
@@ -220,8 +255,8 @@ f2u <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5)
   facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') +
   guides(fill = FALSE)
 f2u
-ggsave(f2u, filename = "../../figs/FigS7a.png", device = 'png', units = 'in', width = 6, height = 5)
-ggsave(f2u, filename = "../../figs/FigS7a.svg", device = 'svg', units = 'in', width = 6, height = 5)
+# ggsave(f2u, filename = "../../figs/FigS7a.png", device = 'png', units = 'in', width = 6, height = 5)
+# ggsave(f2u, filename = "../../figs/FigS7a.svg", device = 'svg', units = 'in', width = 6, height = 5)
 ```
 
 ### Taxonomic dissimilarity
@@ -237,8 +272,9 @@ figsx <- ggplot(filter(chains3_l, hosts !=0, web_study %in% most_relevant_studie
   geom_line(aes(group = index), alpha = 0.2) +
   facet_wrap(~web_study) +
   labs(x = "Sequential predation events (host in cycle)", y = "Taxonomic dissimilarity index", 
-       color = "Proportion primary\nconsumers in food web\ninfected as first hosts") +
-  scale_color_distiller(type = 'div', palette = 'RdBu') +
+       color = "Primary\nconsumers\nas first hosts") +
+  scale_color_distiller(type = 'div', palette = 'RdBu', 
+                        breaks = c(0.01, 0.25, 0.50, 0.75, 1.0)) +
   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
   theme(panel.grid.minor = element_blank(), 
         legend.title = element_text(size = 8),
@@ -327,9 +363,12 @@ f2l <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5)
             aes(x = factor(Host.no), y = hosts, color = perc, fill = NULL),
             alpha = 0.5) +
   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
-  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_color_distiller(type = 'div', palette = 'RdBu', 
+                        breaks = c(0.01, 0.25, 0.50, 0.75, 1.0)) +
   scale_fill_brewer(type = "qual", palette = "Set2") +
-  labs(x = "Stage (host) in life cycle", y = "Taxonomic dissimilarity", color = "Proportion\nfirst hosts") +
+  labs(x = "Stage (host) in life cycle", y = "Taxonomic dissimilarity", 
+       color = "Primary\nconsumers\nas first hosts") +
+
   theme(
         # legend.position = c(1,1),
         # legend.justification = c(1,1),
@@ -341,11 +380,11 @@ f2l <- ggplot(filter(hosts_per_stage, Facultative != 'postcyclic', Host.no != 5)
   facet_grid(~lcl_max_fac, scales = 'free_x', space = 'free_x') +
   guides(fill = FALSE)
 f2l
-ggsave(f2l, filename = "../../figs/FigS7b.svg", device = 'svg', units = 'in', width = 6, height = 5)
-ggsave(f2l, filename = "../../figs/FigS7b.png", device = 'png', units = 'in', width = 6, height = 5)
+# ggsave(f2l, filename = "../../figs/FigS7b.svg", device = 'svg', units = 'in', width = 6, height = 5)
+# ggsave(f2l, filename = "../../figs/FigS7b.png", device = 'png', units = 'in', width = 6, height = 5)
 ```
 
-Then to mirror figure 3, we put the two plots with expectations over observations together and export it.
+Then to mirror original figure 4 in the main text, we put the two plots with expectations over observations together.
 
 ```{r}
 # combine example web fig b and c
@@ -355,20 +394,19 @@ library(cowplot)
 f2u <- f2u + 
   theme(axis.title.x = element_blank(), 
         axis.text.x = element_blank())
-ap <- align_plots(f2u, f2l, align="hv")
-```
-```{r}
-laff3 <- gridExtra::grid.arrange(ap[[1]], ap[[2]])
+ap <- plot_grid(f2u, f2l, align="hv", ncol = 1)
+ap
 ```
 
 ```{r}
-ggsave(filename = "../../figs/FigS7.svg", plot = laff3, units = "in", width = 8, height = 8) # bringing the upper plot down still
+# ggsave(filename = "../../figs/FigS7.svg", plot = laff3, units = "in", width = 8, height = 8) # bringing the upper plot down still
 ```
 ```{r}
 rm(f2u, f2l, laff3, ap)
 ```
 
-Additionally, in Figure 1, we want to use the Carpinteria Salt Marsh food web as an illustration for how generalism changes with successive transmission steps. To that end, we plot host range and taxonomic dissimilarity for simulated cycles for just this food web, stack them, and export the figure.
+Additionally, in the first version of the manuscript, the Carpinteria Salt Marsh food web was used to illustrate how generalism changes with successive transmission steps. To that end, we plot host range and taxonomic dissimilarity for simulated cycles for just this food web and stack them.
+
 ```{r}
 # make figure with one example web, Carpinteria
 laff1 <- ggplot(filter(chains3_l, hosts != 0, web_study == "Lafferty et al. (2006)"),
@@ -386,7 +424,7 @@ laff1 <- ggplot(filter(chains3_l, hosts != 0, web_study == "Lafferty et al. (200
         legend.background = element_rect(color = 'black')) +
   # guides(color = FALSE) +
   annotate(geom = 'text', label = "(a)", x = 1.33, y = 60)
-laff1
+# laff1
 # ggsave(plot = laff1, filename = "Example_web_host_range.png", units = 'in', width = 5, height = 4)
 ```
 ```{r}
@@ -415,7 +453,7 @@ laff2 <- ggplot(filter(chains3_l, hosts !=0, web_study == "Lafferty et al. (2006
         legend.background = element_rect(color = 'black')) +
   guides(color = FALSE) +
   annotate(geom = 'text', label = "(b)", x = 1.33, y = max(chains3_l$hsi, na.rm = T))
-laff2
+# laff2
 # ggsave(plot = laff2, filename = "Example_web_tax_dissim.png", units = 'in', width = 5, height = 4)
 ```
 
@@ -423,18 +461,16 @@ laff2
 laff1 <- laff1 + 
   theme(axis.title.x = element_blank(), 
         axis.text.x = element_blank())
-ap <- align_plots(laff1, laff2, align="hv")
-```
-```{r}
-laff3 <- gridExtra::grid.arrange(ap[[1]], ap[[2]])
+ap <- plot_grid(laff1, laff2, align="hv", ncol = 1)
+ap
 ```
 
 ```{r}
 # This is Fig 3a and b!
-ggsave(filename = "../../figs/Fig3ab.svg", plot = laff3, units = "in", width = 5, height = 8) # bringing the upper plot down still
+# ggsave(filename = "../../figs/Fig3ab.svg", plot = laff3, units = "in", width = 5, height = 8) # bringing the upper plot down still
 ```
 ```{r}
-rm(laff1, laff2, laff3, ap)
+rm(laff1, laff2, ap)
 ```
 
 
@@ -452,9 +488,11 @@ figsx <- ggplot(filter(chains3_l, hosts!=0, web_study %in% most_relevant_studies
   theme(panel.grid.minor = element_blank(),
         legend.title = element_text(size = 8),
         strip.text = element_text(size = 6)) +
-  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_color_distiller(type = 'div', palette = 'RdBu', 
+                        breaks = c(0.01, 0.25, 0.50, 0.75, 1.0)) +
   labs(x = "Sequential predation events (host in cycle)", y = "Cumulative encountered hosts", 
-       color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
+       color = "Primary\nconsumers\nas first hosts")
+  
 figsx
 ggsave(figsx, filename = "../../figs/FigS2.png", device = 'png', width = 6, height = 4)
 ggsave(figsx, filename = "../../figs/FigS2.svg", device = 'svg', width = 6, height = 4)
@@ -546,8 +584,7 @@ dat <- mutate(dat, facultative_lc = if_else(lcl_max != lcl_min, "facultative", "
                                            "partial", "complete"))
 ```
 ```{r}
-# # run this block to exclude species with partial life cycles! 
-dat <- filter(dat, partial_cycle != "partial")
+dat <- filter(dat, partial_cycle != "partial") # run this block to exclude species with partial life cycles! 
 ```
 
 ```{r}
@@ -591,21 +628,25 @@ The observed data do not match the expectations well. In particular, species cou
 ```{r}
 f1a <- ggplot(dat, aes(y = num_hosts_lcdb_nhm, x = lcl_max_fac)) +
   geom_boxplot(outlier.color = NA) +
-  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+  geom_point(alpha = 0.15, position = position_jitter(width = 0.3, height = 0),
              aes(size = pubs_pubmed_spname_group)) +
   geom_line(data = d_out,
             aes(x = factor(Host.no), y = hosts, group = perc, color = perc, fill = NULL),
             linetype = 'solid', alpha = 0.5) +
-  scale_y_log10(limits = c(0.95,max(dat$num_hosts_lcdb_nhm)), breaks = c(1, 5, 10, 25, 50, 100, 200, 400)) +
-  scale_color_distiller(type = 'div', palette = 'RdBu') +
-  labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits", color = "Proportion\nfirst hosts") +
+  scale_y_log10(breaks = c(1, 5, 10, 25, 50, 100, 250)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  scale_color_distiller(type = 'div', palette = 'RdBu', 
+                        breaks = c(0.01, 0.25, 0.50, 0.75, 1.0)) +
+  labs(x = "Life cycle length (max)", y = "Host range", size = "Pubmed hits",
+       color = "Primary\nconsumers\nas first hosts") +
   guides(size = FALSE, color = FALSE) +
   theme(panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank()) +
-  annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm))
+  annotate(geom = 'text', label = "(a)", x = 0.55, y = max(dat$num_hosts_lcdb_nhm)) 
 f1a
-ggsave(f1a, filename = "../../figs/FigS4a.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
-ggsave(f1a, filename = "../../figs/FigS4a.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
+
+# ggsave(f1a, filename = "../../figs/FigS4a.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
+# ggsave(f1a, filename = "../../figs/FigS4a.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
 ```
 
 
@@ -621,10 +662,11 @@ figsx <- ggplot(filter(chains3_l, !is.na(hsi), web_study %in% most_relevant_stud
   theme(panel.grid.minor = element_blank(),
         legend.title = element_text(size = 8),
         strip.text = element_text(size = 6)) +
-  scale_color_distiller(type = 'div', palette = 'RdBu') +
+  scale_color_distiller(type = 'div', palette = 'RdBu', 
+                        breaks = c(0.01, 0.25, 0.50, 0.75, 1.0)) +
   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
-  labs(x = "Sequential predation events (host in cycle)", y = "Cumulative taxonomic dissim index", 
-       color = "Proportion primary\nconsumers in food web\ninfected as first hosts")
+  labs(x = "Sequential predation events (host in cycle)", y = "Cumulative taxonomic dissimilarity index", 
+       color = "Primary\nconsumers\nas first hosts")
 figsx
 ggsave(figsx, filename = "../../figs/FigS3.svg", device = 'svg', width = 6, height = 4)
 ggsave(figsx, filename = "../../figs/FigS3.png", device = 'png', width = 6, height = 4)
@@ -702,26 +744,42 @@ When we overlay expectations from the model on observed species-level generalism
 ```{r}
 f1b <- ggplot(dat, aes(y = hsi_comb, x = lcl_max_fac)) +
   geom_boxplot(outlier.color = NA) +
-  geom_point(alpha = 0.2, position = position_jitter(width = 0.25, height = 0), color = "tomato1",
+  geom_point(alpha = 0.15, position = position_jitter(width = 0.3, height = 0),
              aes(size = pubs_pubmed_spname_group)) +
   geom_line(data = d_out,
             aes(x = factor(Host.no), y = hosts, group = perc, color = perc, fill = NULL),
             linetype = 'solid', alpha = 0.5) +
-  scale_color_distiller(type = 'div', palette = 'RdBu') +
   scale_y_continuous(limits = c(1,6), breaks = c(1:6), labels = c("species", tax.ranks)) +
+  scale_x_discrete(labels = c("1", "2", "3", "4 or 5")) +
+  scale_color_distiller(type = 'div', palette = 'RdBu', 
+                        breaks = c(0.01, 0.25, 0.50, 0.75, 1.0)) +
   labs(x = "Life cycle length (max)", y = "Taxonomic dissimilarity index", size = "Pubmed hits",
-       color = "Proportion\nfirst hosts") +
+       color = "Primary\nconsumers\nas first hosts") +
   guides(size = FALSE) +
   theme(legend.position = c(0.98, 0.02),
         legend.justification = c(1,0),
         legend.background = element_rect(color = 'black'),
         panel.grid.minor = element_blank(),
         panel.grid.major.x = element_blank()) +
-  annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb))
+  annotate(geom = 'text', label = "(b)", x = 0.55, y = max(dat$hsi_comb)) 
 f1b
-ggsave(f1b, filename = "../../figs/FigS4b.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
-ggsave(f1b, filename = "../../figs/FigS4b.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
+
+# ggsave(f1b, filename = "../../figs/FigS4b.svg", device = 'svg', units = 'in', width = 4.5, height = 4.5)
+# ggsave(f1b, filename = "../../figs/FigS4b.png", device = 'png', units = 'in', width = 4.5, height = 4.5)
 ```
+
+```{r}
+f1 <- plot_grid(f1a, f1b, nrow = 1, align = "h")
+```
+```{r}
+fig_width <- 4.5
+fig_height <- 4.5
+
+ggsave(filename = "../../figs/FigS4.png", plot = f1, device = 'png', units = 'in', width = fig_width*2, height = fig_height) 
+ggsave(filename = "../../figs/FigS4.svg", plot = f1, device = 'svg', units = 'in', width = fig_width*2, height = fig_height)
+rm(f1)
+```
+
 
 
 ### Correlation across stages
@@ -781,7 +839,7 @@ s7a <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_host
         panel.grid.minor = element_blank()
         ) 
 s7a
-ggsave(s7a, filename = "../../figs/FigS8a.svg", device = 'svg', height = 4, width = 4)
+# ggsave(s7a, filename = "../../figs/FigS7a.svg", device = 'svg', height = 4, width = 4)
 ```
 
 ```{r}
@@ -799,7 +857,7 @@ s7b <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", third_hosts
            y = max(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0)$third_hosts)) +
   guides(color = F)
 s7b
-ggsave(s7b, filename = "../../figs/FigS8b.svg", device = 'svg', height = 4, width = 4)
+# ggsave(s7b, filename = "../../figs/FigS7b.svg", device = 'svg', height = 4, width = 4)
 ```
 
 ### Taxonomic dissimilarity
@@ -852,7 +910,7 @@ s7c <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_host
            x = 1, y = 6) +
   guides(color = F)
 s7c
-ggsave(s7c, filename = "../../figs/FigS8c.svg", device = 'svg', height = 4, width = 4)
+# ggsave(s7c, filename = "../../figs/FigS7c.svg", device = 'svg', height = 4, width = 4)
 ```
 ```{r}
 s7d <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_hosts != 0),
@@ -868,7 +926,7 @@ s7d <- ggplot(filter(chains3, web_study == "Lafferty et al. (2006)", second_host
            x = 1, y = 6) +
   guides(color = F)
 s7d
-ggsave(s7d, filename = "../../figs/FigS8d.svg", device = 'svg', height = 4, width = 4) # combine S7 a to d into one plot
+# ggsave(s7d, filename = "../../figs/FigS7d.svg", device = 'svg', height = 4, width = 4) # combine S7 a to d into one plot
 ```
 
 # Conclusions
