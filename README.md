@@ -44,4 +44,4 @@ Our study showed that complex life cycle parasites are generalists - the longer 
 
 # Reference
 
-Add when appropriate...
+[Benesh et al. 2021. Trade-offs with growth limit host range in complex life-cycle helminths. The American Naturalist.](https://www.journals.uchicago.edu/doi/10.1086/712249)
